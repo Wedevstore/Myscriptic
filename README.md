@@ -43,9 +43,13 @@ To learn more about Next.js, take a look at the following resources:
 
 ## Deploy
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new).
+The frontend is designed to deploy on **[Vercel](https://vercel.com)** from GitHub. The Laravel API can live anywhere with HTTPS (e.g. **`api.myscriptic.com`** on **CyberPanel** with **PostgreSQL**).
 
-Check out the [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+- **Wire Vercel ↔ Laravel ↔ DB:** [docs/production-api-vercel-cyberpanel.md](docs/production-api-vercel-cyberpanel.md)
+- **Next.js:** copy [`.env.example`](.env.example) to `.env.local` (points at `https://api.myscriptic.com/api` by default)
+- **Laravel + PostgreSQL:** `backend/.env.example` — local DB via `docker compose -f backend/docker-compose.postgres.yml up -d`, then `php artisan migrate`
+
+Check out the [Next.js deployment documentation](https://nextjs.org/docs/deployment) for Vercel specifics.
 
 ---
 

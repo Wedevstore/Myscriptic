@@ -36,4 +36,10 @@ jobs:
       - name: Production build
         env:
           NEXT_PUBLIC_SITE_URL: https://myscriptic.vercel.app
+          NEXT_PUBLIC_API_URL: https://api.myscriptic.com/api
+          NEXT_PUBLIC_USE_LARAVEL_AUTH: "true"
+          NEXT_PUBLIC_USE_LARAVEL_PHASE2: "true"
+          NEXT_PUBLIC_USE_LARAVEL_PHASE3: "true"
+          NEXT_PUBLIC_USE_LARAVEL_COURSES: "true"
+          NEXT_PUBLIC_CMS_FROM_API: "true"
         run: npm run build

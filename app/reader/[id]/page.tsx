@@ -2267,8 +2267,8 @@ function ReaderContent() {
                 </span>
               </li>
               <li>
-                Bottom bar and table of contents jump between sections; settings hold theme, fonts, layout, and auto-scroll
-                (vertical mode).
+                Bottom bar and table of contents jump between sections; the contents drawer traps keyboard focus while
+                open. Settings hold theme, fonts, layout, and auto-scroll (vertical mode).
               </li>
               <li>
                 With <span className="font-medium">auto-scroll</span> on: wheel, touch-drag, space, or arrow keys pause it.
