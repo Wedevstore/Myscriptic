@@ -427,7 +427,9 @@ export default function AdminSettingsPage() {
           <div className="bg-muted/50 rounded-xl p-4 space-y-1">
             <Users size={16} className="text-muted-foreground mb-1" />
             <p className="text-xs font-semibold text-foreground">Admin Role</p>
-            <p className="text-[10px] text-muted-foreground">Only users with role = "admin" can access this panel. Roles are managed in the auth system.</p>
+            <p className="text-[10px] text-muted-foreground">
+              Only users with role = &quot;admin&quot; can access this panel. Roles are managed in the auth system.
+            </p>
           </div>
           <div className="bg-muted/50 rounded-xl p-4 space-y-1">
             <Shield size={16} className="text-muted-foreground mb-1" />

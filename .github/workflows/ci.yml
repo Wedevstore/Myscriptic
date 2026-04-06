@@ -27,5 +27,10 @@ jobs:
       - name: Typecheck
         run: npm run lint
 
+      - name: ESLint
+        run: npm run eslint
+
       - name: Production build
+        env:
+          NEXT_PUBLIC_SITE_URL: https://myscriptic.vercel.app
         run: npm run build

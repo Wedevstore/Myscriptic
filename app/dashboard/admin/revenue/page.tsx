@@ -590,7 +590,7 @@ function RevenueContent() {
               <h2 className="font-semibold text-foreground mb-5">Revenue Pool Formula</h2>
               <div className="space-y-4">
                 <div className="p-4 bg-muted rounded-xl text-sm">
-                  <p className="font-mono text-muted-foreground text-xs mb-2">// Pool calculation engine</p>
+                  <p className="font-mono text-muted-foreground text-xs mb-2">{"// Pool calculation engine"}</p>
                   <p className="font-mono text-foreground">Total = Σ(subscriptions + purchases)</p>
                   <p className="font-mono text-destructive/80 mt-1">Admin Cut = Total × {settings.adminCommissionPct}%</p>
                   <p className="font-mono text-brand mt-1">Author Pool = Total × {100 - settings.adminCommissionPct}%</p>

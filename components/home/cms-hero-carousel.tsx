@@ -18,11 +18,9 @@ export function CmsHeroCarousel({ items }: Props) {
   const [anim, setAnim] = React.useState(false)
   const [dir, setDir] = React.useState<"next" | "prev">("next")
 
-  if (banners.length === 0) return null
-
   const go = React.useCallback(
     (idx: number, direction: "next" | "prev" = "next") => {
-      if (anim) return
+      if (anim || banners.length === 0) return
       setDir(direction)
       setAnim(true)
       setTimeout(() => {
@@ -30,18 +28,21 @@ export function CmsHeroCarousel({ items }: Props) {
         setAnim(false)
       }, 280)
     },
-    [anim]
+    [anim, banners.length]
   )
 
-  const prev = () => go((active - 1 + banners.length) % banners.length, "prev")
-  const next = () => go((active + 1) % banners.length, "next")
-
   React.useEffect(() => {
+    if (banners.length === 0) return
     const id = setInterval(() => {
       setActive(a => (a + 1) % banners.length)
     }, 7000)
     return () => clearInterval(id)
   }, [banners.length])
+
+  if (banners.length === 0) return null
+
+  const prev = () => go((active - 1 + banners.length) % banners.length, "prev")
+  const next = () => go((active + 1) % banners.length, "next")
 
   const b = banners[active]
   const href = resolveCmsLink(b.link_type, b.link_value)

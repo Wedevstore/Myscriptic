@@ -362,7 +362,10 @@ function TaxContent() {
               <p key={c.id} className="text-foreground">
                 <span className="text-brand">{c.name}</span>{" "}
                 = (subtotal - discount) &times; <span className="text-brand">{(c.rate * 100).toFixed(2)}%</span>
-                <span className="text-muted-foreground ml-2">// applies to {c.appliesTo === "all" ? "all purchases" : "paid books"}</span>
+                <span className="text-muted-foreground ml-2">
+                  {"// applies to "}
+                  {c.appliesTo === "all" ? "all purchases" : "paid books"}
+                </span>
               </p>
             ))}
           </div>
