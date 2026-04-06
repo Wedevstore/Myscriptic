@@ -4,15 +4,28 @@
  * Central HTTP client that connects to the Laravel backend.
  * All methods include the Sanctum token from localStorage when present.
  *
- * Base URL is read from NEXT_PUBLIC_API_URL env var.
- * Falls back to mock data when the backend is not yet running.
+ * API origin is read from NEXT_PUBLIC_API_URL (scheme + host, no path), e.g.
+ * `https://api.myscriptic.com`. The client always calls `${origin}/api/...` to match Laravel's `routes/api.php`.
+ * Legacy: if the value already ends with `/api`, it is accepted as-is.
  *
  * Replace every TODO_MOCK comment with real fetch once Laravel is live.
  */
 
 import type { ApiCourseCard, ApiCourseDetail } from "@/lib/courses-from-api"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.myscriptic.com/api"
+const DEFAULT_API_ORIGIN = "https://api.myscriptic.com"
+
+/** Resolves Laravel JSON API base (…/api) from NEXT_PUBLIC_API_URL. */
+function laravelApiBaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL?.trim()
+  const origin = (raw && raw.length > 0 ? raw : DEFAULT_API_ORIGIN).replace(/\/+$/, "")
+  if (origin.endsWith("/api")) {
+    return origin
+  }
+  return `${origin}/api`
+}
+
+const BASE_URL = laravelApiBaseUrl()
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null

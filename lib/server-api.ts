@@ -1,14 +1,19 @@
 /**
  * Server-only fetch for SEO (sitemap, generateMetadata).
  * Only calls the network when NEXT_PUBLIC_API_URL is set (matches client {@link apiUrlConfigured}).
+ * Paths are appended under `/api` (same as {@link ./api.ts}).
  */
 
 import { apiUrlConfigured } from "@/lib/auth-mode"
 
-function apiBase(): string {
+function laravelApiBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_API_URL?.trim()
   if (!raw) return ""
-  return raw.replace(/\/$/, "")
+  let base = raw.replace(/\/+$/, "")
+  if (!base.endsWith("/api")) {
+    base = `${base}/api`
+  }
+  return base
 }
 
 const SERVER_FETCH_MS = 8000
@@ -18,7 +23,7 @@ export async function serverFetchJson<T>(
   revalidateSeconds: number | false = 120
 ): Promise<T | null> {
   if (!apiUrlConfigured()) return null
-  const base = apiBase()
+  const base = laravelApiBaseUrl()
   if (!base) return null
 
   const p = path.startsWith("/") ? path : `/${path}`
@@ -43,5 +48,5 @@ export async function serverFetchJson<T>(
 }
 
 export function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://myscriptic.com").replace(/\/$/, "")
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.myscriptic.com").replace(/\/$/, "")
 }

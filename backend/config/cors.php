@@ -24,7 +24,17 @@ return [
         explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:3000'))
     ))),
 
-    'allowed_origins_patterns' => [],
+    /*
+    | When true (default), preview deployments whose Origin matches https://*.vercel.app
+    | are allowed without listing each deployment URL in CORS_ALLOWED_ORIGINS.
+    | Set CORS_USE_VERCEL_PREVIEW_ORIGINS=false in .env to disable and rely on the explicit list only.
+    */
+    'allowed_origins_patterns' => filter_var(
+        env('CORS_USE_VERCEL_PREVIEW_ORIGINS', 'true'),
+        FILTER_VALIDATE_BOOLEAN
+    ) ? [
+        '#^https://[\w-]+\.vercel\.app$#',
+    ] : [],
 
     'allowed_headers' => ['*'],
 

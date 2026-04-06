@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import './globals.css'
 
-const DEFAULT_SITE_URL = 'https://myscriptic.com'
+/** Fallback when `NEXT_PUBLIC_SITE_URL` is unset (must match production canonical). */
+const DEFAULT_SITE_URL = "https://www.myscriptic.com"
 
 function resolveMetadataBase(): URL {
   const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
@@ -20,6 +21,8 @@ function resolveMetadataBase(): URL {
   }
 }
 
+const resolvedMetadataBase = resolveMetadataBase()
+
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
@@ -33,7 +36,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  metadataBase: resolveMetadataBase(),
+  metadataBase: resolvedMetadataBase,
   title: {
     default: 'MyScriptic — Read, Discover & Earn',
     template: '%s | MyScriptic',
@@ -46,7 +49,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://myscriptic.com',
+    url: resolvedMetadataBase.href.replace(/\/$/, ""),
     siteName: 'MyScriptic',
     title: 'MyScriptic — Read, Discover & Earn',
     description: 'Discover millions of ebooks, audiobooks & stories. Subscribe or buy once.',

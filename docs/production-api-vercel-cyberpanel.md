@@ -1,6 +1,6 @@
 # Connect Next.js (Vercel) to Laravel (`api.myscriptic.com`) on CyberPanel
 
-This repo’s SPA uses **`NEXT_PUBLIC_API_URL`** (must end with **`/api`**) and sends **`Authorization: Bearer …`** to Laravel (`lib/api.ts`). Feature flags live in **`lib/auth-mode.ts`**.
+This repo’s SPA sets **`NEXT_PUBLIC_API_URL`** to the API **origin only** (e.g. `https://api.myscriptic.com`, no path). `lib/api.ts` calls **`${origin}/api/...`** so routes match Laravel’s `routes/api.php`. Values that already end with **`/api`** still work. **`Authorization: Bearer …`** is sent on requests. Feature flags live in **`lib/auth-mode.ts`**.
 
 ## 1. Laravel on CyberPanel (PostgreSQL)
 
@@ -52,27 +52,29 @@ Ensure **HTTPS** works for `https://api.myscriptic.com` (CyberPanel / OpenLiteSp
 
 ### CORS (required for the browser)
 
-Laravel reads **`CORS_ALLOWED_ORIGINS`** (comma-separated, no spaces after commas). Include **every** origin that loads the Next app:
+Laravel reads **`CORS_ALLOWED_ORIGINS`** (comma-separated, no spaces after commas). **Apex, `www`, and each `*.vercel.app` host are different origins** — list each hostname users load the Next app from. Production-style example:
 
 ```env
-CORS_ALLOWED_ORIGINS=https://myscriptic.vercel.app,https://myscriptic.com,https://www.myscriptic.com
+CORS_ALLOWED_ORIGINS=https://myscriptic.com,https://www.myscriptic.com,https://myscriptic.vercel.app,http://localhost:3000
 ```
 
-Config is in **`backend/config/cors.php`**. After changing `.env`, clear config cache if you use it:
+**Preview deployments:** `backend/config/cors.php` also applies a pattern for **`https://*.vercel.app`** when **`CORS_USE_VERCEL_PREVIEW_ORIGINS=true`** (default). Set **`CORS_USE_VERCEL_PREVIEW_ORIGINS=false`** if you want to allow only origins listed explicitly in `CORS_ALLOWED_ORIGINS`.
+
+After changing `.env`, refresh config cache (e.g. as your deploy user):
 
 ```bash
 php artisan config:clear
+php artisan config:cache
 ```
+
+**Check:** preflight with `Origin: https://myscriptic.vercel.app` should echo that origin, e.g. **`Access-Control-Allow-Origin: https://myscriptic.vercel.app`**.
 
 ### Frontend URL (emails, redirects, Phase 2 helpers)
 
-Align with your real site:
+**`FRONTEND_URL`** must match the URL users and payment providers actually return to:
 
-```env
-FRONTEND_URL=https://myscriptic.vercel.app
-```
-
-(Or your custom domain when you cut over.)
+- **Production (canonical `www`):** `https://www.myscriptic.com` — aligned with **`NEXT_PUBLIC_SITE_URL`** on Vercel Production. Keep **`https://myscriptic.com`** in **`CORS_ALLOWED_ORIGINS`** if the apex still serves traffic or redirects.
+- **Vercel-only** (previews / no custom domain): **`https://myscriptic.vercel.app`** for Preview env; run `config:clear` and `config:cache` after changes.
 
 ### Sanctum / API auth
 
@@ -82,20 +84,22 @@ The Next client stores a token and uses **Bearer** headers. Ensure Laravel issue
 
 ## 2. Vercel (GitHub deploy)
 
+Keep **`NEXT_PUBLIC_API_URL=https://api.myscriptic.com`** (API **origin** only, **no** `/api`); `laravelApiBaseUrl()` in `lib/api.ts` appends `/api` for Laravel.
+
 In **Vercel → Project → Settings → Environment Variables**, set at least:
 
 | Name | Example |
 |------|---------|
-| `NEXT_PUBLIC_API_URL` | `https://api.myscriptic.com/api` |
-| `NEXT_PUBLIC_SITE_URL` | `https://myscriptic.vercel.app` (or custom domain) |
+| `NEXT_PUBLIC_API_URL` | `https://api.myscriptic.com` (origin only; `/api` is appended in code) |
+| `NEXT_PUBLIC_SITE_URL` | **Production:** `https://www.myscriptic.com` · **Preview:** `https://myscriptic.vercel.app` · **Development:** `http://localhost:3000` |
 | `NEXT_PUBLIC_USE_LARAVEL_AUTH` | `true` |
 | `NEXT_PUBLIC_USE_LARAVEL_PHASE2` | `true` when marketplace APIs are ready |
 | `NEXT_PUBLIC_USE_LARAVEL_PHASE3` | `true` for reader / subscriptions / progress sync |
 | `NEXT_PUBLIC_USE_LARAVEL_COURSES` | `true` when course APIs are ready |
 
-`NEXT_PUBLIC_*` variables are applied at **build** time. **Redeploy** after changing them.
+`NEXT_PUBLIC_*` variables are applied at **build** time. **Redeploy Production** (or push a commit) after changing them so the client bundle picks up values like **`NEXT_PUBLIC_SITE_URL`**. New Preview deployments pick up Preview env automatically; redeploy an open preview if you need new vars immediately.
 
-Preview deployments: add your **preview URL pattern** to Laravel **`CORS_ALLOWED_ORIGINS`** (e.g. `https://myscriptic-git-*-wedevstore.vercel.app` is awkward—often people use a regex via `allowed_origins_patterns` in `cors.php`, or test previews against a staging API with broader CORS).
+Preview hostnames: with **`CORS_USE_VERCEL_PREVIEW_ORIGINS=true`**, `https://*.vercel.app` is covered by **`backend/config/cors.php`**. Turn it off if you need a strict explicit list only.
 
 ---
 
@@ -105,10 +109,10 @@ Preview deployments: add your **preview URL pattern** to Laravel **`CORS_ALLOWED
 2. Point at your API:
 
    ```env
-   NEXT_PUBLIC_API_URL=https://api.myscriptic.com/api
+   NEXT_PUBLIC_API_URL=https://api.myscriptic.com
    ```
 
-   Or `http://localhost:8000/api` if Laravel runs locally.
+   Or `http://localhost:8000` if Laravel runs locally (still no `/api` in the env value).
 
 3. Set the same `NEXT_PUBLIC_USE_LARAVEL_*` flags you use on Vercel.
 4. Ensure **`CORS_ALLOWED_ORIGINS`** on Laravel includes **`http://localhost:3000`**.

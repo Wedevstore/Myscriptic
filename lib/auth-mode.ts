@@ -6,7 +6,7 @@ function envFalsey(v: string | undefined): boolean {
   return v === "false" || v === "0"
 }
 
-/** True when the SPA targets a real API base (`NEXT_PUBLIC_API_URL`), not the bundled default. */
+/** True when `NEXT_PUBLIC_API_URL` is set (API origin, e.g. `https://api.myscriptic.com` — `/api` is appended in `lib/api.ts`). */
 export function apiUrlConfigured(): boolean {
   const u = process.env.NEXT_PUBLIC_API_URL?.trim()
   return Boolean(u && u.length > 0)

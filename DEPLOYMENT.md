@@ -18,8 +18,9 @@ Copy from `backend/.env.example` and set at minimum:
 |------|-----------|
 | Core | `APP_KEY`, `APP_URL`, `APP_ENV=production`, `APP_DEBUG=false` |
 | DB | `DB_*` (use managed MySQL/Postgres in production) |
-| CORS | `CORS_ALLOWED_ORIGINS=https://your-frontend-domain` |
-| Frontend | `FRONTEND_URL=https://your-frontend-domain` (password reset emails, payment return URLs) |
+| CORS | `CORS_ALLOWED_ORIGINS` — comma-separated origins (no spaces); include **apex, `www`, production Vercel host, and `http://localhost:3000`** as needed. Each is a distinct origin. |
+| CORS previews | `CORS_USE_VERCEL_PREVIEW_ORIGINS=true` (default) allows `https://*.vercel.app` via `config/cors.php` patterns; set `false` to rely only on `CORS_ALLOWED_ORIGINS`. |
+| Frontend | `FRONTEND_URL` — must match the live site (**`https://www.myscriptic.com`** when that is canonical) and **Vercel `NEXT_PUBLIC_SITE_URL`**; use **`https://myscriptic.vercel.app`** for preview-only checkout. Mismatch causes wrong redirects after payment. |
 | Cache | `CACHE_STORE=redis`, `REDIS_*` |
 | Queue | `QUEUE_CONNECTION=redis` (or `database` with a worker) |
 | Mail | `MAIL_MAILER`, `MAIL_HOST`, `MAIL_*`, `MAIL_FROM_*` (Mailgun, SES, Postmark, etc.) |
@@ -35,7 +36,7 @@ Run `php artisan config:cache` and `php artisan route:cache` after changes.
 
 | Variable | Purpose |
 |----------|---------|
-| `NEXT_PUBLIC_API_URL` | Base URL to Laravel API including `/api`, e.g. `https://api.example.com/api` |
+| `NEXT_PUBLIC_API_URL` | Laravel API **origin** only (no path), e.g. `https://api.example.com`. The Next.js client calls `${origin}/api/...`. |
 | `NEXT_PUBLIC_SITE_URL` | Canonical site URL for SEO (`metadataBase`, sitemap, robots) |
 
 ## Laravel on Ubuntu (VPS)
