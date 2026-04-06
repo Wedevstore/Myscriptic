@@ -15,21 +15,94 @@ import {
 } from "@/components/ui/select"
 import {
   ChevronLeft, Plus, Trash2, Edit2, Copy, Check,
-  Percent, DollarSign, AlertCircle, Tag, Search,
+  Percent, DollarSign, AlertCircle, Tag, Search, Download,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { apiUrlConfigured } from "@/lib/auth-mode"
+import { couponsApi } from "@/lib/api"
 import { couponStore, seedP4, type Coupon, type CouponType } from "@/lib/store-p4"
+
+function mapApiCoupon(c: Record<string, unknown>): Coupon {
+  const dt = String(c.discount_type ?? "pct")
+  const exp = c.expires_at
+  return {
+    id: String(c.id ?? ""),
+    code: String(c.code ?? ""),
+    type: dt === "fixed" ? "fixed" : "percent",
+    value: Number(c.discount_value ?? 0),
+    maxUses: Number(c.max_uses ?? 1000),
+    usedCount: Number(c.used_count ?? 0),
+    expiresAt: exp ? String(exp) : "",
+    isActive: Boolean(c.is_active ?? true),
+    createdAt: String(c.updated_at ?? c.created_at ?? new Date().toISOString()),
+  }
+}
+
+function couponExpired(c: Coupon): boolean {
+  if (!c.expiresAt?.trim()) return false
+  const t = new Date(c.expiresAt).getTime()
+  return !Number.isNaN(t) && t < Date.now()
+}
+
+function escCouponCsv(s: string) {
+  return `"${String(s).replace(/"/g, '""')}"`
+}
+
+function exportCouponsCsv(rows: Coupon[], live: boolean) {
+  const header = ["id", "code", "discount_type", "discount_value", "max_uses", "used_count", "expires_at", "is_active", "created_at"]
+  const lines = [
+    live ? "# source: API" : "# source: local demo store",
+    header.join(","),
+    ...rows.map(c =>
+      [
+        c.id,
+        c.code,
+        c.type === "percent" ? "percent" : "fixed",
+        String(c.value),
+        String(c.maxUses),
+        String(c.usedCount),
+        c.expiresAt ?? "",
+        c.isActive ? "1" : "0",
+        c.createdAt,
+      ]
+        .map(escCouponCsv)
+        .join(","),
+    ),
+  ]
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(blob)
+  a.download = `coupons-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function useCoupons() {
+  const live = apiUrlConfigured()
   const [coupons, setCoupons] = React.useState<Coupon[]>([])
-  const reload = React.useCallback(() => {
+  const [loading, setLoading] = React.useState(false)
+  const reload = React.useCallback(async () => {
+    if (live) {
+      setLoading(true)
+      try {
+        const res = await couponsApi.list()
+        setCoupons(((res.data ?? []) as Record<string, unknown>[]).map(mapApiCoupon))
+      } catch {
+        setCoupons([])
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
     seedP4()
     setCoupons(couponStore.getAll())
-  }, [])
-  React.useEffect(() => { reload() }, [reload])
-  return { coupons, reload }
+  }, [live])
+  React.useEffect(() => {
+    void reload()
+  }, [reload])
+  return { coupons, reload, loading, live }
 }
 
 const EMPTY_FORM = {
@@ -55,7 +128,7 @@ function CouponRow({
   onEdit: (c: Coupon) => void
 }) {
   const [copied, setCopied] = React.useState(false)
-  const isExpired = new Date(coupon.expiresAt) < new Date()
+  const isExpired = couponExpired(coupon)
   const usagePercent = Math.min((coupon.usedCount / coupon.maxUses) * 100, 100)
 
   const copyCode = () => {
@@ -181,11 +254,13 @@ function CouponFormDialog({
   editing,
   onClose,
   onSave,
+  codeLocked,
 }: {
   open: boolean
   editing: Coupon | null
   onClose: () => void
   onSave: (data: typeof EMPTY_FORM) => void
+  codeLocked?: boolean
 }) {
   const [form, setForm] = React.useState(EMPTY_FORM)
 
@@ -227,6 +302,7 @@ function CouponFormDialog({
                 onChange={e => set("code", e.target.value.toUpperCase().replace(/\s/g, ""))}
                 placeholder="e.g. SAVE20"
                 className="mt-1.5 font-mono tracking-wider"
+                disabled={Boolean(codeLocked && editing)}
               />
             </div>
 
@@ -324,58 +400,98 @@ function CouponFormDialog({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminCouponsPage() {
-  const { coupons, reload } = useCoupons()
+  const { coupons, reload, loading, live } = useCoupons()
 
   const [search,     setSearch]     = React.useState("")
   const [filter,     setFilter]     = React.useState("all")
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [editing,    setEditing]    = React.useState<Coupon | null>(null)
   const [deleteId,   setDeleteId]   = React.useState<string | null>(null)
+  const [apiError,   setApiError]   = React.useState<string | null>(null)
 
   const filtered = coupons.filter(c => {
     const q = search.toLowerCase()
     const matchSearch = !q || c.code.toLowerCase().includes(q)
     const matchFilter =
       filter === "all"     ? true :
-      filter === "active"  ? c.isActive && new Date(c.expiresAt) >= new Date() :
-      filter === "expired" ? new Date(c.expiresAt) < new Date() :
+      filter === "active"  ? c.isActive && !couponExpired(c) :
+      filter === "expired" ? couponExpired(c) :
       filter === "pct"     ? c.type === "percent" :
                              c.type === "fixed"
     return matchSearch && matchFilter
   })
 
-  const handleSave = (data: typeof EMPTY_FORM) => {
+  const handleSave = async (data: typeof EMPTY_FORM) => {
+    setApiError(null)
+    const expiresAt =
+      data.expiresAt?.trim() ? data.expiresAt : new Date(Date.now() + 365 * 86400000).toISOString()
     const payload = {
       code:      data.code.trim().toUpperCase(),
       type:      data.type,
       value:     data.value,
       maxUses:   data.maxUses,
-      expiresAt: data.expiresAt || new Date(Date.now() + 365 * 86400000).toISOString(),
+      expiresAt,
       isActive:  data.isActive,
     }
-    if (editing) {
-      couponStore.update(editing.id, payload)
-    } else {
-      couponStore.create(payload)
+    try {
+      if (live) {
+        if (editing) {
+          await couponsApi.update(editing.id, {
+            discount_type: payload.type === "percent" ? "pct" : "fixed",
+            discount_value: payload.value,
+            expires_at: data.expiresAt?.trim() ? data.expiresAt : null,
+            max_uses: payload.maxUses,
+            is_active: payload.isActive,
+          })
+        } else {
+          await couponsApi.create({
+            code: payload.code,
+            discount_type: payload.type === "percent" ? "pct" : "fixed",
+            discount_value: payload.value,
+            expires_at: data.expiresAt?.trim() ? data.expiresAt : null,
+            max_uses: payload.maxUses,
+            min_order_amount: 0,
+            is_active: payload.isActive,
+          })
+        }
+      } else if (editing) {
+        couponStore.update(editing.id, payload)
+      } else {
+        couponStore.create(payload)
+      }
+      setDialogOpen(false)
+      setEditing(null)
+      await reload()
+    } catch (e) {
+      setApiError(e instanceof Error ? e.message : "Request failed")
     }
-    setDialogOpen(false)
-    setEditing(null)
-    reload()
   }
 
-  const handleDelete = (id: string) => {
-    couponStore.delete(id)
-    setDeleteId(null)
-    reload()
+  const handleDelete = async (id: string) => {
+    setApiError(null)
+    try {
+      if (live) await couponsApi.delete(id)
+      else couponStore.delete(id)
+      setDeleteId(null)
+      await reload()
+    } catch (e) {
+      setApiError(e instanceof Error ? e.message : "Delete failed")
+    }
   }
 
-  const handleToggle = (id: string, active: boolean) => {
-    couponStore.update(id, { isActive: active })
-    reload()
+  const handleToggle = async (id: string, active: boolean) => {
+    setApiError(null)
+    try {
+      if (live) await couponsApi.update(id, { is_active: active })
+      else couponStore.update(id, { isActive: active })
+      await reload()
+    } catch (e) {
+      setApiError(e instanceof Error ? e.message : "Update failed")
+    }
   }
 
-  const activeCoupons  = coupons.filter(c => c.isActive && new Date(c.expiresAt) >= new Date())
-  const expiredCoupons = coupons.filter(c => new Date(c.expiresAt) < new Date())
+  const activeCoupons  = coupons.filter(c => c.isActive && !couponExpired(c))
+  const expiredCoupons = coupons.filter(c => couponExpired(c))
   const totalUses      = coupons.reduce((s, c) => s + c.usedCount, 0)
 
   return (
@@ -387,15 +503,41 @@ export default function AdminCouponsPage() {
         </Link>
         <div className="flex-1">
           <h1 className="font-serif text-2xl font-bold text-foreground">Coupon Codes</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Create and manage discount coupons for checkout</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Create and manage discount coupons for checkout
+            {live && (
+              <Badge variant="outline" className="ml-2 text-[10px] align-middle">
+                Live API
+              </Badge>
+            )}
+          </p>
         </div>
-        <Button
-          onClick={() => { setEditing(null); setDialogOpen(true) }}
-          className="bg-brand hover:bg-brand-dark text-primary-foreground gap-1.5 h-9"
-        >
-          <Plus size={15} />New Coupon
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 text-xs"
+            disabled={filtered.length === 0}
+            onClick={() => exportCouponsCsv(filtered, live)}
+          >
+            <Download size={14} />
+            Export CSV
+          </Button>
+          <Button
+            onClick={() => { setEditing(null); setDialogOpen(true) }}
+            className="bg-brand hover:bg-brand-dark text-primary-foreground gap-1.5 h-9"
+          >
+            <Plus size={15} />New Coupon
+          </Button>
+        </div>
       </div>
+
+      {apiError && (
+        <p className="text-sm text-destructive mb-4" role="alert">
+          {apiError}
+        </p>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -460,7 +602,13 @@ export default function AdminCouponsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-16 text-center text-muted-foreground text-sm">
+                  Loading coupons…
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-16 text-center text-muted-foreground text-sm">
                   <Tag size={28} className="mx-auto mb-3 opacity-20" />
@@ -488,6 +636,7 @@ export default function AdminCouponsPage() {
         editing={editing}
         onClose={() => { setDialogOpen(false); setEditing(null) }}
         onSave={handleSave}
+        codeLocked={live}
       />
 
       {/* Delete confirm dialog */}
@@ -502,7 +651,9 @@ export default function AdminCouponsPage() {
             <Button
               variant="destructive"
               className="flex-1"
-              onClick={() => deleteId && handleDelete(deleteId)}
+              onClick={() => {
+                if (deleteId) void handleDelete(deleteId)
+              }}
             >
               Delete
             </Button>

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { seedP4, activityLogStore } from "@/lib/store-p4"
 import { Save, Check, Globe, DollarSign, BookOpen, Users, Bell, Shield, RefreshCw, Megaphone } from "lucide-react"
 import { adminApi } from "@/lib/api"
+import { apiUrlConfigured } from "@/lib/auth-mode"
 import { Textarea } from "@/components/ui/textarea"
 
 // ── Local-storage backed platform settings ────────────────────────────────────
@@ -90,9 +91,11 @@ export default function AdminSettingsPage() {
   const [saved,    setSaved]    = React.useState(false)
   const [loading,  setLoading]  = React.useState(true)
 
-  const [sfLoading, setSfLoading] = React.useState(true)
+  const [sfLoading, setSfLoading] = React.useState(() => apiUrlConfigured())
   const [sfSaved, setSfSaved] = React.useState(false)
   const [sfError, setSfError] = React.useState("")
+  const [saveErr, setSaveErr] = React.useState("")
+  const live = apiUrlConfigured()
   const [siteFeatures, setSiteFeatures] = React.useState({
     ads_enabled: false,
     ads_network: "adsense",
@@ -106,6 +109,10 @@ export default function AdminSettingsPage() {
   React.useEffect(() => { seedP4(); setSettings(loadSettings()); setLoading(false) }, [])
 
   React.useEffect(() => {
+    if (!live) {
+      setSfLoading(false)
+      return
+    }
     adminApi
       .siteFeatures()
       .then(r => {
@@ -122,7 +129,20 @@ export default function AdminSettingsPage() {
       })
       .catch(() => setSfError("Could not load site features (check admin session)."))
       .finally(() => setSfLoading(false))
-  }, [])
+  }, [live])
+
+  React.useEffect(() => {
+    if (!live) return
+    adminApi
+      .subscriptionPoolSettings()
+      .then(s => {
+        const commission = Number(s.subscription_pool_commission_pct ?? 30)
+        const authorPct = 100 - commission
+        const snapped = Math.min(90, Math.max(50, Math.round(authorPct / 5) * 5))
+        setSettings(prev => ({ ...prev, authorRevenueShare: snapped }))
+      })
+      .catch(() => { /* keep local default */ })
+  }, [live])
 
   function set<K extends keyof PlatformSettings>(key: K, val: PlatformSettings[K]) {
     setSettings(s => ({ ...s, [key]: val }))
@@ -147,12 +167,21 @@ export default function AdminSettingsPage() {
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
+    setSaveErr("")
     saveSettings(settings)
+    if (live) {
+      try {
+        await adminApi.updateSubscriptionPoolSettings(100 - settings.authorRevenueShare)
+      } catch (e) {
+        setSaveErr(e instanceof Error ? e.message : "Could not save subscription pool settings.")
+        return
+      }
+    }
     activityLogStore.log({
       userId:   "admin",
       userName: "Admin",
-      action:   "Platform settings updated",
+      action:   live ? "Subscription pool commission updated (API)" : "Platform settings updated",
       category: "admin",
       metadata: {},
     })
@@ -171,8 +200,12 @@ export default function AdminSettingsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-bold text-foreground">Platform Settings</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-serif text-2xl font-bold text-foreground">Platform Settings</h1>
+            {live && <Badge variant="outline" className="text-[10px]">API</Badge>}
+          </div>
           <p className="text-sm text-muted-foreground mt-0.5">Configure global platform behaviour and defaults.</p>
+          {saveErr && <p className="text-xs text-destructive mt-1">{saveErr}</p>}
         </div>
         <Button
           onClick={handleSave}
@@ -238,8 +271,16 @@ export default function AdminSettingsPage() {
 
       {/* Revenue */}
       <Section title="Revenue & Payouts" icon={DollarSign}>
+        {live && (
+          <p className="text-xs text-muted-foreground -mt-2 mb-2">
+            The slider updates Laravel <code className="text-[10px] bg-muted px-1 rounded">subscription_pool_commission_pct</code> (platform keeps{" "}
+            {100 - settings.authorRevenueShare}%, authors share the remainder of the subscription engagement pool). General options below still save to this browser only.
+          </p>
+        )}
         <div className="space-y-1">
-          <Label className="text-xs font-semibold">Author Revenue Share (%)</Label>
+          <Label className="text-xs font-semibold">
+            {live ? "Subscription pool — author share (%)" : "Author Revenue Share (%)"}
+          </Label>
           <div className="flex items-center gap-3">
             <Input
               type="range" min={50} max={90} step={5}

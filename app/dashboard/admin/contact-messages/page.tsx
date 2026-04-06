@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Mail, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { Mail, ChevronLeft, ChevronRight, Loader2, Download } from "lucide-react"
 import { adminApi } from "@/lib/api"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 
@@ -55,6 +55,50 @@ const MOCK_ROWS: ContactRow[] = [
     created_at: new Date(Date.now() - 86400000).toISOString(),
   },
 ]
+
+function escContactCsv(s: string) {
+  return `"${String(s).replace(/"/g, '""')}"`
+}
+
+function exportContactSubmissionsCsv(
+  list: ContactRow[],
+  live: boolean,
+  meta: ListMeta | null,
+) {
+  const lines: string[] = []
+  if (live && meta && meta.last_page > 1) {
+    lines.push(
+      `# paginated export: page ${meta.current_page} of ${meta.last_page} (${meta.per_page} per page); download other pages separately`,
+    )
+  } else if (!live) {
+    lines.push("# demo inbox data (NEXT_PUBLIC_API_URL not set)")
+  }
+  lines.push(
+    ["id", "created_at", "name", "email", "topic", "message", "author_ref", "ip_address"].join(","),
+  )
+  for (const r of list) {
+    lines.push(
+      [
+        r.id,
+        r.created_at ?? "",
+        r.name,
+        r.email,
+        r.topic,
+        r.message,
+        r.author_ref ?? "",
+        r.ip_address ?? "",
+      ]
+        .map(escContactCsv)
+        .join(","),
+    )
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(blob)
+  a.download = `contact-submissions-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
 
 function isContactRow(v: unknown): v is ContactRow {
   if (!v || typeof v !== "object") return false
@@ -133,11 +177,25 @@ export default function AdminContactMessagesPage() {
             {!live && " Demo data is shown until `NEXT_PUBLIC_API_URL` is set."}
           </p>
         </div>
-        {meta && (
-          <Badge variant="outline" className="font-mono text-[11px]">
-            {meta.total} total
-          </Badge>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {rows.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => exportContactSubmissionsCsv(rows, live, meta)}
+            >
+              <Download size={12} />
+              Export CSV
+            </Button>
+          )}
+          {meta && (
+            <Badge variant="outline" className="font-mono text-[11px]">
+              {meta.total} total
+            </Badge>
+          )}
+        </div>
       </div>
 
       {error && (

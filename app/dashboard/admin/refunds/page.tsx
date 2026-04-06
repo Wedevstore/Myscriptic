@@ -27,18 +27,20 @@ import {
   BookOpen, Headphones, ChevronDown, ChevronUp, Eye,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { apiUrlConfigured } from "@/lib/auth-mode"
+import { refundsApi } from "@/lib/api"
 import { orderStore, seedStore, CURRENCY_SYMBOLS, type Order } from "@/lib/store"
 
 // ── Refund request data model ────────────────────────────────────────────────
 interface RefundRequest {
-  id:          string
-  orderId:     string
-  orderNumber: string
-  userId:      string
+  id:           string
+  orderId:      string
+  orderNumber:  string
+  userId:       string
   customerName: string
-  amount:      number
-  currency:    string
-  gateway:     string
+  amount:       number
+  currency:     string
+  gateway:      string
   reason:      string
   status:      "pending" | "approved" | "rejected" | "processed"
   submittedAt: string
@@ -110,6 +112,34 @@ function buildRefundRequests(orders: Order[]): RefundRequest[] {
   return [...pendingRequests, approvedRequest, ...base]
 }
 
+function mapApiRefund(row: Record<string, unknown>): RefundRequest {
+  const itemsRaw = Array.isArray(row.items) ? row.items : []
+  const items = itemsRaw.map((i: Record<string, unknown>) => ({
+    title: String(i.title ?? "—"),
+    price: Number(i.price ?? 0),
+    format: String(i.format ?? "ebook"),
+  }))
+  const typ = String(row.type ?? "full") === "partial" ? "partial" : "full"
+  const amt = row.amount != null ? Number(row.amount) : 0
+  return {
+    id: String(row.id),
+    orderId: String(row.order_id ?? ""),
+    orderNumber: String(row.order_number ?? `#${row.order_id ?? ""}`),
+    userId: String(row.user_id ?? ""),
+    customerName: String(row.customer_name ?? "—"),
+    amount: amt,
+    currency: String(row.currency ?? "USD"),
+    gateway: String(row.gateway ?? "paystack"),
+    reason: String(row.reason ?? "Admin refund"),
+    status: "processed",
+    submittedAt: String(row.created_at ?? ""),
+    resolvedAt: String(row.created_at ?? ""),
+    items: items.length ? items : [{ title: "Order total", price: amt, format: "ebook" }],
+    type: typ,
+    partialAmount: typ === "partial" ? amt : undefined,
+  }
+}
+
 // ── Status meta ───────────────────────────────────────────────────────────────
 const STATUS_META = {
   pending:   { label: "Pending",   cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400", icon: Clock },
@@ -131,11 +161,13 @@ function RefundRow({
   onApprove,
   onReject,
   onProcess,
+  readOnly,
 }: {
   req: RefundRequest
-  onApprove:  (id: string) => void
-  onReject:   (id: string) => void
-  onProcess:  (id: string) => void
+  onApprove: (id: string) => void
+  onReject: (id: string) => void
+  onProcess: (id: string) => void
+  readOnly?: boolean
 }) {
   const [expanded, setExpanded] = React.useState(false)
   const meta = STATUS_META[req.status]
@@ -190,9 +222,10 @@ function RefundRow({
         </td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex gap-1.5 items-center">
-            {req.status === "pending" && (
+            {!readOnly && req.status === "pending" && (
               <>
                 <button
+                  type="button"
                   onClick={() => onApprove(req.id)}
                   className="p-1.5 rounded-md bg-green-100 dark:bg-green-900/20 text-green-600 hover:bg-green-200 transition-colors"
                   aria-label="Approve refund"
@@ -200,6 +233,7 @@ function RefundRow({
                   <CheckCircle2 size={13} />
                 </button>
                 <button
+                  type="button"
                   onClick={() => onReject(req.id)}
                   className="p-1.5 rounded-md bg-red-100 dark:bg-red-900/20 text-red-500 hover:bg-red-200 transition-colors"
                   aria-label="Reject refund"
@@ -208,8 +242,9 @@ function RefundRow({
                 </button>
               </>
             )}
-            {req.status === "approved" && (
+            {!readOnly && req.status === "approved" && (
               <button
+                type="button"
                 onClick={() => onProcess(req.id)}
                 className="p-1.5 rounded-md bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
                 aria-label="Process refund"
@@ -243,7 +278,10 @@ function RefundRow({
                         : <BookOpen size={12} className="text-muted-foreground shrink-0" />
                       }
                       <span className="flex-1 text-foreground font-medium truncate">{item.title}</span>
-                      <span className="font-bold text-brand shrink-0">${item.price.toFixed(2)}</span>
+                      <span className="font-bold text-brand shrink-0">
+                    {sym}
+                    {item.price.toFixed(2)}
+                  </span>
                     </div>
                   ))}
                 </div>
@@ -294,18 +332,38 @@ function RefundRow({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 function RefundsContent() {
+  const live = apiUrlConfigured()
   const [requests, setRequests] = React.useState<RefundRequest[]>([])
-  const [search,   setSearch]   = React.useState("")
+  const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
-  const [selected, setSelected]  = React.useState<RefundRequest | null>(null)
-  const [action,   setAction]    = React.useState<"reject" | null>(null)
+  const [selected, setSelected] = React.useState<RefundRequest | null>(null)
+  const [action, setAction] = React.useState<"reject" | null>(null)
   const [rejectReason, setRejectReason] = React.useState("")
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  const reload = React.useCallback(async () => {
+    if (live) {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await refundsApi.list()
+        setRequests(((res.data ?? []) as Record<string, unknown>[]).map(mapApiRefund))
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load refunds")
+        setRequests([])
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+    seedStore()
+    setRequests(buildRefundRequests(orderStore.getAll()))
+  }, [live])
 
   React.useEffect(() => {
-    seedStore()
-    const orders = orderStore.getAll()
-    setRequests(buildRefundRequests(orders))
-  }, [])
+    void reload()
+  }, [reload])
 
   const handleApprove = (id: string) => {
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status: "approved" } : r))
@@ -336,19 +394,51 @@ function RefundsContent() {
     if (req) orderStore.markRefunded(req.orderId, "full")
   }
 
-  const filtered = requests.filter(r => {
-    const matchSearch = !search ||
-      r.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      r.orderNumber.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === "all" || r.status === statusFilter
-    return matchSearch && matchStatus
-  }).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+  const filtered = requests
+    .filter(r => {
+      const matchSearch =
+        !search ||
+        r.customerName.toLowerCase().includes(search.toLowerCase()) ||
+        r.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
+        r.userId.toLowerCase().includes(search.toLowerCase())
+      const matchStatus = statusFilter === "all" || r.status === statusFilter
+      return matchSearch && matchStatus
+    })
+    .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
 
-  const pendingCount   = requests.filter(r => r.status === "pending").length
-  const approvedCount  = requests.filter(r => r.status === "approved").length
+  const pendingCount = requests.filter(r => r.status === "pending").length
+  const approvedCount = requests.filter(r => r.status === "approved").length
   const processedTotal = requests
     .filter(r => r.status === "processed")
     .reduce((s, r) => s + (r.type === "partial" && r.partialAmount ? r.partialAmount : r.amount), 0)
+
+  function exportCsv() {
+    const header = ["id", "order_number", "customer", "amount", "currency", "gateway", "status", "created_at"]
+    const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+    const lines = [
+      header.join(","),
+      ...filtered.map(r =>
+        [
+          r.id,
+          r.orderNumber,
+          r.customerName,
+          String(r.type === "partial" && r.partialAmount ? r.partialAmount : r.amount),
+          r.currency,
+          r.gateway,
+          r.status,
+          r.submittedAt,
+        ]
+          .map(esc)
+          .join(",")
+      ),
+    ]
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = "refunds-export.csv"
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -368,8 +458,16 @@ function RefundsContent() {
         )}
       </div>
       <p className="text-sm text-muted-foreground mb-8">
-        Review and process customer refund requests. Approved refunds are forwarded to the payment gateway.
+        {live
+          ? "Refunds recorded in Laravel (admin-issued). Issue new refunds from Order Management."
+          : "Review and process customer refund requests. Approved refunds are forwarded to the payment gateway."}
       </p>
+
+      {error && (
+        <p className="text-sm text-destructive mb-4" role="alert">
+          {error}
+        </p>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -377,7 +475,13 @@ function RefundsContent() {
           { label: "Total Requests",  value: requests.length,            icon: RefreshCw,    color: "text-brand",                                bg: "bg-brand/10" },
           { label: "Pending Review",  value: pendingCount,               icon: Clock,        color: "text-amber-600 dark:text-amber-400",         bg: "bg-amber-50 dark:bg-amber-900/20" },
           { label: "Awaiting Process",value: approvedCount,              icon: CheckCircle2, color: "text-blue-600 dark:text-blue-400",           bg: "bg-blue-50 dark:bg-blue-900/20" },
-          { label: "Total Refunded",  value: `$${processedTotal.toFixed(2)}`, icon: DollarSign, color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20" },
+          {
+            label: "Total Refunded",
+            value: live ? `${processedTotal.toFixed(2)} (mixed CCY)` : `$${processedTotal.toFixed(2)}`,
+            icon: DollarSign,
+            color: "text-green-600 dark:text-green-400",
+            bg: "bg-green-50 dark:bg-green-900/20",
+          },
         ].map(kpi => (
           <div key={kpi.label} className="bg-card border border-border rounded-xl p-4">
             <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center mb-3", kpi.bg, kpi.color)}>
@@ -424,7 +528,7 @@ function RefundsContent() {
           <Filter size={13} />
           {filtered.length} of {requests.length}
         </div>
-        <Button variant="outline" size="sm" className="h-9 gap-2">
+        <Button variant="outline" size="sm" className="h-9 gap-2" onClick={exportCsv}>
           <Download size={14} /> Export CSV
         </Button>
       </div>
@@ -443,7 +547,13 @@ function RefundsContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-16 text-center text-muted-foreground text-sm">
+                    Loading refunds…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-16 text-center text-muted-foreground text-sm">
                     No refund requests match your filters.
@@ -454,6 +564,7 @@ function RefundsContent() {
                   <RefundRow
                     key={req.id}
                     req={req}
+                    readOnly={live}
                     onApprove={handleApprove}
                     onReject={handleReject}
                     onProcess={handleProcess}

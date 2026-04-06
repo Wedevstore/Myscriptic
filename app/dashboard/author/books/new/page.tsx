@@ -48,6 +48,13 @@ const ACCESS_OPTIONS: { value: AccessType; label: string; desc: string; icon: Re
   { value: "PAID", label: "One-time Purchase", desc: "Readers pay once to access", icon: CreditCard },
 ]
 
+const BOOK_FORM_DRAFT_KEY = "myscriptic_author_book_draft_v1"
+
+type DraftableFields = Pick<
+  BookFormState,
+  "title" | "description" | "sampleExcerpt" | "category" | "tags" | "format" | "accessType" | "price" | "currency"
+>
+
 const FORMAT_OPTIONS: { value: BookFormat; label: string; icon: React.ElementType }[] = [
   { value: "ebook", label: "eBook (PDF/EPUB)", icon: FileText },
   { value: "audiobook", label: "Audiobook (MP3)", icon: Headphones },
@@ -104,6 +111,7 @@ function BookUploadForm() {
   const [submitting, setSubmitting] = React.useState(false)
   const [submitted, setSubmitted] = React.useState(false)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
+  const [draftSavedAt, setDraftSavedAt] = React.useState<number | null>(null)
 
   const [form, setForm] = React.useState<BookFormState>({
     title: "", description: "", sampleExcerpt: "", category: "", tags: [], tagInput: "",
@@ -117,6 +125,60 @@ function BookUploadForm() {
       router.replace("/auth/login?next=%2Fdashboard%2Fauthor%2Fbooks%2Fnew")
     }
   }, [isLoading, isAuthenticated, router])
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BOOK_FORM_DRAFT_KEY)
+      if (!raw) return
+      const d = JSON.parse(raw) as Partial<DraftableFields>
+      setForm(f => ({
+        ...f,
+        title: typeof d.title === "string" ? d.title : f.title,
+        description: typeof d.description === "string" ? d.description : f.description,
+        sampleExcerpt: typeof d.sampleExcerpt === "string" ? d.sampleExcerpt : f.sampleExcerpt,
+        category: typeof d.category === "string" ? d.category : f.category,
+        tags: Array.isArray(d.tags) ? d.tags.filter((t): t is string => typeof t === "string").slice(0, 8) : f.tags,
+        format: d.format === "ebook" || d.format === "audiobook" || d.format === "magazine" ? d.format : f.format,
+        accessType:
+          d.accessType === "FREE" || d.accessType === "PAID" || d.accessType === "SUBSCRIPTION"
+            ? d.accessType
+            : f.accessType,
+        price: typeof d.price === "string" ? d.price : f.price,
+        currency: typeof d.currency === "string" ? d.currency : f.currency,
+      }))
+    } catch {
+      /* ignore corrupt draft */
+    }
+  }, [])
+
+  function clearBookDraft() {
+    try {
+      localStorage.removeItem(BOOK_FORM_DRAFT_KEY)
+    } catch {
+      /* ignore */
+    }
+    setDraftSavedAt(null)
+  }
+
+  function saveBookDraft() {
+    const payload: DraftableFields = {
+      title: form.title,
+      description: form.description,
+      sampleExcerpt: form.sampleExcerpt,
+      category: form.category,
+      tags: form.tags,
+      format: form.format,
+      accessType: form.accessType,
+      price: form.price,
+      currency: form.currency,
+    }
+    try {
+      localStorage.setItem(BOOK_FORM_DRAFT_KEY, JSON.stringify(payload))
+      setDraftSavedAt(Date.now())
+    } catch {
+      setSubmitError("Could not save draft in this browser.")
+    }
+  }
 
   const set = (field: keyof BookFormState, value: unknown) =>
     setForm(f => ({ ...f, [field]: value }))
@@ -167,6 +229,7 @@ function BookUploadForm() {
           payload.price = parseFloat(form.price)
         }
         await booksApi.createJson(payload)
+        clearBookDraft()
         setSubmitting(false)
         setSubmitted(true)
       } catch (err) {
@@ -177,6 +240,7 @@ function BookUploadForm() {
     }
 
     await new Promise(r => setTimeout(r, 1800))
+    clearBookDraft()
     setSubmitting(false)
     setSubmitted(true)
   }
@@ -201,6 +265,7 @@ function BookUploadForm() {
             variant="outline"
             onClick={() => {
               setSubmitted(false)
+              clearBookDraft()
               setForm(f => ({
                 ...f,
                 title: "",
@@ -208,6 +273,10 @@ function BookUploadForm() {
                 sampleExcerpt: "",
                 tags: [],
                 tagInput: "",
+                coverFile: null,
+                coverPreview: null,
+                bookFile: null,
+                audioFile: null,
               }))
             }}
           >
@@ -454,19 +523,28 @@ function BookUploadForm() {
         </section>
 
         {/* Submit */}
-        <div className="flex gap-3">
-          <Button
-            type="submit"
-            disabled={submitting || !form.title || !form.description || !form.category}
-            className="flex-1 bg-brand hover:bg-brand-dark text-primary-foreground font-semibold h-12"
-          >
-            {submitting ? (
-              <><Loader2 size={16} className="mr-2 animate-spin" /> Uploading to S3...</>
-            ) : (
-              "Submit for Review"
-            )}
-          </Button>
-          <Button type="button" variant="outline" className="h-12">Save Draft</Button>
+        <div className="space-y-2">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              type="submit"
+              disabled={submitting || !form.title || !form.description || !form.category}
+              className="flex-1 bg-brand hover:bg-brand-dark text-primary-foreground font-semibold h-12"
+            >
+              {submitting ? (
+                <><Loader2 size={16} className="mr-2 animate-spin" /> Uploading to S3...</>
+              ) : (
+                "Submit for Review"
+              )}
+            </Button>
+            <Button type="button" variant="outline" className="h-12 sm:w-40 shrink-0" onClick={saveBookDraft}>
+              Save draft
+            </Button>
+          </div>
+          {draftSavedAt != null && (
+            <p className="text-xs text-muted-foreground">
+              Draft saved in this browser (text, tags, pricing — not file uploads). It reloads when you return to this page.
+            </p>
+          )}
         </div>
       </div>
     </form>

@@ -497,6 +497,15 @@ export const adminApi = {
       cycleId && cycleId !== "all" ? `?cycle_id=${encodeURIComponent(cycleId)}` : ""
     return downloadAuthenticatedFile(`/admin/author-payouts/export${qs}`, "author-payouts.csv")
   },
+
+  /** Paginated orders with line items (admin). */
+  orders: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : ""
+    return request<{
+      data: unknown[]
+      meta: { current_page: number; last_page: number; total: number }
+    }>(`/admin/orders${qs}`)
+  },
   subscriptionPoolSettings: () =>
     request<{ subscription_pool_commission_pct: number }>("/admin/subscription-pool/settings"),
   updateSubscriptionPoolSettings: (subscription_pool_commission_pct: number) =>
@@ -504,6 +513,25 @@ export const adminApi = {
       method: "PUT",
       body: JSON.stringify({ subscription_pool_commission_pct }),
     }),
+
+  subscriptionPlans: () => request<{ data: unknown[] }>("/admin/subscription-plans"),
+  subscriptionPlanCreate: (body: Record<string, unknown>) =>
+    request<{ data: unknown }>("/admin/subscription-plans", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  subscriptionPlanUpdate: (id: string | number, body: Record<string, unknown>) =>
+    request<{ data: unknown }>(`/admin/subscription-plans/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  subscriptionPlanDelete: (id: string | number) =>
+    request<void>(`/admin/subscription-plans/${id}`, { method: "DELETE" }),
+
+  auditLogs: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : ""
+    return request<{ data: unknown[] }>(`/admin/audit-logs${qs}`)
+  },
 
   siteFeatures: () =>
     request<{
@@ -688,7 +716,11 @@ export const refundsApi = {
   create: (orderId: string, type: "full" | "partial", amount?: number) =>
     request<{ success: boolean; refund_id: string }>("/admin/refunds", {
       method: "POST",
-      body:   JSON.stringify({ order_id: orderId, type, ...(amount ? { amount } : {}) }),
+      body: JSON.stringify({
+        order_id: Number(orderId),
+        type,
+        ...(type === "partial" && amount != null ? { amount } : {}),
+      }),
     }),
   list: () =>
     request<{ data: unknown[] }>("/admin/refunds"),

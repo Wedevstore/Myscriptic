@@ -25,6 +25,12 @@ class AdminUserController extends Controller
         if ($request->boolean('blocked_only')) {
             $q->whereNotNull('blocked_at');
         }
+        if ($request->boolean('unblocked_only')) {
+            $q->whereNull('blocked_at');
+        }
+        if ($request->filled('role')) {
+            $q->where('role', $request->string('role'));
+        }
 
         $p = $q->paginate($request->integer('per_page', 30));
 

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { TRENDING_AUTHORS } from "@/lib/mock-data"
-import { laravelAuthEnabled } from "@/lib/auth-mode"
+import { apiUrlConfigured, laravelAuthEnabled } from "@/lib/auth-mode"
 import { authorsApi, authorFollowsApi } from "@/lib/api"
 import {
   loadAuthorFollowIdsFromStorage,
@@ -26,19 +26,20 @@ type AuthorRow = {
 export function TrendingAuthors() {
   const { isAuthenticated } = useAuth()
   const laravel = laravelAuthEnabled()
+  const hasApi = apiUrlConfigured()
   const [authors, setAuthors] = React.useState<AuthorRow[]>(TRENDING_AUTHORS)
   const [followed, setFollowed] = React.useState<Set<string>>(() => new Set())
   const [busyId, setBusyId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    if (!laravel) return
+    if (!hasApi) return
     authorsApi
       .trending()
       .then(res => {
         if (Array.isArray(res.data) && res.data.length > 0) setAuthors(res.data)
       })
       .catch(() => {})
-  }, [laravel])
+  }, [hasApi])
 
   React.useEffect(() => {
     if (laravel && isAuthenticated) {

@@ -16,6 +16,19 @@ import {
   TrendingUp, Filter, CheckCircle, Clock, XCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { adminApi } from "@/lib/api"
+import { apiUrlConfigured } from "@/lib/auth-mode"
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+function periodToMonthLabel(period: string): string {
+  const parts = period.split("-")
+  if (parts.length >= 2) {
+    const mi = Number(parts[1]) - 1
+    if (mi >= 0 && mi < 12) return MONTH_SHORT[mi]
+  }
+  return period
+}
 
 // ── Mock audit log ─────────────────────────────────────────────────────────
 const AUDIT_LOG = [
@@ -67,13 +80,114 @@ const STATUS_CONFIG = {
   failed: { label: "Failed",   color: "bg-red-100 text-red-500 dark:bg-red-900/20 dark:text-red-400" },
 }
 
+type PayoutRow = (typeof PAYOUT_REPORTS)[number]
+
+function mapAuthorPayoutApi(row: Record<string, unknown>): PayoutRow {
+  const author = row.author as Record<string, unknown> | undefined
+  const weight = Number(row.engagement_weight ?? 0)
+  const share = Number(row.share_percentage ?? 0)
+  const gross = Number(row.gross_earnings ?? 0)
+  const st = String(row.status ?? "pending")
+  const statusUi = st === "hold" ? "held" : st
+  return {
+    id: String(row.id ?? ""),
+    author: String(author?.name ?? "—"),
+    email: String(author?.email ?? ""),
+    reads: Math.round(weight),
+    engagement: Math.round(share * 100) / 100,
+    gross,
+    commission: 0,
+    net: gross,
+    status: statusUi as PayoutRow["status"],
+  }
+}
+
+type AuditRow = (typeof AUDIT_LOG)[number]
+
+function mapAuditApi(row: Record<string, unknown>): AuditRow {
+  const actor = row.actor as Record<string, unknown> | undefined | null
+  const payload = row.payload as Record<string, unknown> | undefined
+  const amt = payload?.amount
+  return {
+    id: `aud_${row.id}`,
+    event: String(row.action ?? "—"),
+    user: actor?.name ? String(actor.name) : (row.actor_id ? `User #${row.actor_id}` : "System"),
+    amount: amt != null && amt !== "" ? Number(amt) : null,
+    author:
+      row.entity_type != null
+        ? `${String(row.entity_type)}${row.entity_id != null ? ` #${row.entity_id}` : ""}`
+        : null,
+    timestamp: String(row.created_at ?? "")
+      .replace("T", " ")
+      .replace(/\.\d{3}Z?$/, "")
+      .slice(0, 19),
+    status: "completed",
+  } as AuditRow
+}
+
 function AdminReportsContent() {
+  const live = apiUrlConfigured()
   const [activeTab, setActiveTab] = React.useState<"payouts" | "audit">("payouts")
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
+  const [payoutRows, setPayoutRows] = React.useState<PayoutRow[]>(PAYOUT_REPORTS)
+  const [auditRows, setAuditRows] = React.useState<AuditRow[]>(AUDIT_LOG)
+  const [dash, setDash] = React.useState<Record<string, number> | null>(null)
+  const [revMonthly, setRevMonthly] = React.useState<{ month: string; total: number }[]>([])
+  const [loadErr, setLoadErr] = React.useState("")
+  const [loading, setLoading] = React.useState(false)
+  const [payoutBusy, setPayoutBusy] = React.useState<string | null>(null)
+
+  const reload = React.useCallback(async () => {
+    if (!live) {
+      setPayoutRows(PAYOUT_REPORTS)
+      setAuditRows(AUDIT_LOG)
+      return
+    }
+    setLoadErr("")
+    try {
+      const [p, d, rev] = await Promise.all([
+        adminApi.authorPayouts(),
+        adminApi.dashboard(),
+        adminApi.analyticsRevenue("monthly"),
+      ])
+      setPayoutRows((p.data as Record<string, unknown>[]).map(mapAuthorPayoutApi))
+      setDash(d)
+      setRevMonthly(
+        (rev.data as { period: string; amount: number }[]).map(r => ({
+          month: periodToMonthLabel(r.period),
+          total: r.amount,
+        }))
+      )
+    } catch (e) {
+      setLoadErr(e instanceof Error ? e.message : "Load failed")
+    }
+  }, [live])
+
+  React.useEffect(() => {
+    if (!live) return
+    setLoading(true)
+    void reload().finally(() => setLoading(false))
+  }, [live, reload])
+
+  React.useEffect(() => {
+    if (!live || activeTab !== "audit") return
+    let cancel = false
+    adminApi
+      .auditLogs()
+      .then(r => {
+        if (!cancel) setAuditRows((r.data as Record<string, unknown>[]).map(mapAuditApi))
+      })
+      .catch(e => {
+        if (!cancel) setLoadErr(e instanceof Error ? e.message : "Audit load failed")
+      })
+    return () => { cancel = true }
+  }, [live, activeTab])
+
+  const reportSource = live ? payoutRows : PAYOUT_REPORTS
 
   // Filter reports
-  const filteredReports = PAYOUT_REPORTS.filter(r => {
+  const filteredReports = reportSource.filter(r => {
     const matchSearch = !search || r.author.toLowerCase().includes(search.toLowerCase()) || r.email.includes(search.toLowerCase())
     const matchStatus = statusFilter === "all" || r.status === statusFilter
     return matchSearch && matchStatus
@@ -90,33 +204,118 @@ function AdminReportsContent() {
     { reads: 0, gross: 0, commission: 0, net: 0 }
   )
 
+  const paidCount = reportSource.filter(r => r.status === "paid").length
+  const pendingCount = reportSource.filter(r => r.status === "pending").length
+  const poolListed = reportSource.reduce((s, r) => s + r.net, 0)
+
+  const kpiStats = live && dash
+    ? [
+        {
+          label: "Platform revenue (MTD)",
+          value: `$${dash.revenue_month_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+          icon: DollarSign,
+          delta: null as string | null,
+          color: "text-green-500",
+          bg: "bg-green-50 dark:bg-green-900/20",
+        },
+        {
+          label: "Listed author pool (sum)",
+          value: `$${poolListed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          icon: TrendingUp,
+          delta: null,
+          color: "text-brand",
+          bg: "bg-amber-50 dark:bg-amber-900/20",
+        },
+        {
+          label: "Paid / pending payouts",
+          value: `${paidCount} / ${pendingCount}`,
+          icon: Shield,
+          delta: null,
+          color: "text-purple-500",
+          bg: "bg-purple-50 dark:bg-purple-900/20",
+        },
+        {
+          label: "Payout rows loaded",
+          value: String(reportSource.length),
+          icon: Users,
+          delta: null,
+          color: "text-blue-500",
+          bg: "bg-blue-50 dark:bg-blue-900/20",
+        },
+      ]
+    : [
+        { label: "Total Revenue", value: "$148,200", icon: DollarSign, delta: "+18.2%", color: "text-green-500", bg: "bg-green-50 dark:bg-green-900/20" },
+        { label: "Author Pool (70%)", value: "$103,740", icon: TrendingUp, delta: null, color: "text-brand", bg: "bg-amber-50 dark:bg-amber-900/20" },
+        { label: "Platform Commission", value: "$44,460", icon: Shield, delta: null, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
+        { label: "Authors Paid", value: "8 / 12", icon: Users, delta: null, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
+      ]
+
+  async function handleApprovePayout(id: string) {
+    if (!live) return
+    setPayoutBusy(id)
+    try {
+      await adminApi.approveAuthorPayout(id)
+      await reload()
+    } catch (e) {
+      setLoadErr(e instanceof Error ? e.message : "Approve failed")
+    } finally {
+      setPayoutBusy(null)
+    }
+  }
+
+  async function handleHoldPayout(id: string) {
+    if (!live) return
+    setPayoutBusy(id)
+    try {
+      await adminApi.holdAuthorPayout(id)
+      await reload()
+    } catch (e) {
+      setLoadErr(e instanceof Error ? e.message : "Hold failed")
+    } finally {
+      setPayoutBusy(null)
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Link href="/dashboard/admin/revenue" className="text-muted-foreground hover:text-foreground transition-colors">
               <ChevronLeft size={18} />
             </Link>
             <FileText size={20} className="text-brand" />
             <h1 className="font-serif text-3xl font-bold text-foreground">Financial Reports</h1>
+            {live && (
+              <Badge variant="outline" className="text-[10px]">API</Badge>
+            )}
           </div>
           <p className="text-muted-foreground">Monthly payout reports, audit logs, and revenue analytics — January 2026.</p>
+          {loadErr && <p className="text-sm text-destructive mt-2">{loadErr}</p>}
         </div>
-        <Button className="bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2" size="sm">
-          <Download size={14} /> Export CSV
-        </Button>
+        <div className="flex gap-2">
+          {live && (
+            <Button variant="outline" size="sm" className="gap-2" type="button" onClick={() => { setLoading(true); void reload().finally(() => setLoading(false)) }} disabled={loading}>
+              Refresh
+            </Button>
+          )}
+          <Button
+            className="bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2"
+            size="sm"
+            type="button"
+            onClick={() => {
+              if (live) void adminApi.authorPayoutsExport().catch(e => setLoadErr(e instanceof Error ? e.message : "Export failed"))
+            }}
+          >
+            <Download size={14} /> Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* KPI summary row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "Total Revenue", value: "$148,200", icon: DollarSign, delta: "+18.2%", color: "text-green-500", bg: "bg-green-50 dark:bg-green-900/20" },
-          { label: "Author Pool (70%)", value: "$103,740", icon: TrendingUp, delta: null, color: "text-brand", bg: "bg-amber-50 dark:bg-amber-900/20" },
-          { label: "Platform Commission", value: "$44,460", icon: Shield, delta: null, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/20" },
-          { label: "Authors Paid", value: "8 / 12", icon: Users, delta: null, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-        ].map(stat => (
+        {kpiStats.map(stat => (
           <div key={stat.label} className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-start justify-between mb-3">
               <div className={cn("p-2 rounded-lg", stat.bg, stat.color)}>
@@ -138,33 +337,56 @@ function AdminReportsContent() {
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
         {/* Revenue breakdown bar chart */}
         <div className="bg-card border border-border rounded-xl p-5">
-          <h2 className="font-semibold text-sm text-foreground mb-4">Revenue Breakdown (6 months)</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={REVENUE_CHART} barGap={2}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-              <Tooltip
-                contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                formatter={(v) => [`$${Number(v ?? 0).toLocaleString()}`, ""]}
-              />
-              <Bar dataKey="authorPool" name="Author Pool" fill="hsl(var(--brand))" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="commission" name="Commission" fill="var(--muted-foreground)" radius={[4, 4, 0, 0]} opacity={0.5} />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="flex gap-4 mt-3 justify-center">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <div className="w-3 h-3 rounded bg-brand" /> Author Pool
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <div className="w-3 h-3 rounded bg-muted-foreground opacity-50" /> Commission
-            </div>
+          <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+            <h2 className="font-semibold text-sm text-foreground">
+              {live && revMonthly.length > 0 ? "Paid revenue by month (API)" : "Revenue Breakdown (6 months)"}
+            </h2>
+            {live && revMonthly.length === 0 && <Badge variant="secondary" className="text-[9px]">Demo chart</Badge>}
           </div>
+          <ResponsiveContainer width="100%" height={200}>
+            {live && revMonthly.length > 0 ? (
+              <BarChart data={revMonthly.slice(-6)} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                  formatter={(v) => [`$${Number(v ?? 0).toLocaleString()}`, "Paid"]}
+                />
+                <Bar dataKey="total" name="Paid revenue" fill="hsl(var(--brand))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            ) : (
+              <BarChart data={REVENUE_CHART} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                  formatter={(v) => [`$${Number(v ?? 0).toLocaleString()}`, ""]}
+                />
+                <Bar dataKey="authorPool" name="Author Pool" fill="hsl(var(--brand))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="commission" name="Commission" fill="var(--muted-foreground)" radius={[4, 4, 0, 0]} opacity={0.5} />
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+          {!(live && revMonthly.length > 0) && (
+            <div className="flex gap-4 mt-3 justify-center">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="w-3 h-3 rounded bg-brand" /> Author Pool
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="w-3 h-3 rounded bg-muted-foreground opacity-50" /> Commission
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Engagement trend */}
         <div className="bg-card border border-border rounded-xl p-5">
-          <h2 className="font-semibold text-sm text-foreground mb-4">Avg. Completion Rate Trend (%)</h2>
+          <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+            <h2 className="font-semibold text-sm text-foreground">Avg. Completion Rate Trend (%)</h2>
+            {live && <Badge variant="secondary" className="text-[9px]">Demo</Badge>}
+          </div>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={ENGAGEMENT_TREND}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -234,8 +456,12 @@ function AdminReportsContent() {
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Author</th>
-                  <th className="text-right p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reads</th>
-                  <th className="text-right p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Engagement %</th>
+                  <th className="text-right p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {live ? "Weight" : "Reads"}
+                  </th>
+                  <th className="text-right p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {live ? "Pool %" : "Engagement %"}
+                  </th>
                   <th className="text-right p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Gross</th>
                   <th className="text-right p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Commission</th>
                   <th className="text-right p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Net Payout</th>
@@ -264,22 +490,42 @@ function AdminReportsContent() {
                       </td>
                       <td className="p-3">
                         <div className="flex gap-1.5 justify-end">
-                          {r.status === "pending" && (
+                          {r.status === "pending" && live && (
                             <>
-                              <button className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1">
+                              <button
+                                type="button"
+                                className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                disabled={payoutBusy === r.id}
+                                onClick={() => void handleApprovePayout(r.id)}
+                              >
                                 <CheckCircle size={11} /> Approve
                               </button>
-                              <button className="px-2.5 py-1 rounded bg-red-100 dark:bg-red-900/20 text-red-500 text-[11px] font-semibold hover:bg-red-200 transition-colors flex items-center gap-1">
+                              <button
+                                type="button"
+                                className="px-2.5 py-1 rounded bg-red-100 dark:bg-red-900/20 text-red-500 text-[11px] font-semibold hover:bg-red-200 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                disabled={payoutBusy === r.id}
+                                onClick={() => void handleHoldPayout(r.id)}
+                              >
                                 <Clock size={11} /> Hold
                               </button>
                             </>
                           )}
-                          {r.status === "held" && (
-                            <button className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1">
+                          {r.status === "pending" && !live && (
+                            <>
+                              <button type="button" className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1">
+                                <CheckCircle size={11} /> Approve
+                              </button>
+                              <button type="button" className="px-2.5 py-1 rounded bg-red-100 dark:bg-red-900/20 text-red-500 text-[11px] font-semibold hover:bg-red-200 transition-colors flex items-center gap-1">
+                                <Clock size={11} /> Hold
+                              </button>
+                            </>
+                          )}
+                          {r.status === "held" && !live && (
+                            <button type="button" className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1">
                               <CheckCircle size={11} /> Release
                             </button>
                           )}
-                          <button className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" aria-label="Download report">
+                          <button type="button" className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" aria-label="Download report">
                             <Download size={12} />
                           </button>
                         </div>
@@ -311,7 +557,9 @@ function AdminReportsContent() {
           <div className="p-4 border-b border-border flex items-center gap-2">
             <Shield size={14} className="text-brand" />
             <span className="text-sm font-semibold text-foreground">Financial Audit Log</span>
-            <span className="text-xs text-muted-foreground ml-1">— immutable record of all financial operations</span>
+            <span className="text-xs text-muted-foreground ml-1">
+              {live ? "— from GET /admin/audit-logs" : "— immutable record of all financial operations"}
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -326,7 +574,7 @@ function AdminReportsContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {AUDIT_LOG.map(log => {
+                {(live ? auditRows : AUDIT_LOG).map(log => {
                   const cfg = STATUS_CONFIG[log.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.completed
                   return (
                     <tr key={log.id} className="hover:bg-muted/30 transition-colors">

@@ -11,7 +11,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { adminApi } from "@/lib/api"
-import { getPlatformStats, seedP4, activityLogStore, notificationStore } from "@/lib/store-p4"
+import { apiUrlConfigured } from "@/lib/auth-mode"
+import { apiRevenueCycleToRow } from "@/lib/admin-revenue-mapper"
+import { getPlatformStats, seedP4, activityLogStore, notificationStore, type ActivityLog } from "@/lib/store-p4"
 import { revenueCycleStore, seedStore } from "@/lib/store"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 
@@ -20,9 +22,44 @@ const TT_STYLE = {
   borderRadius: 8, fontSize: 11, color: "var(--color-foreground)",
 }
 
+function mapActionToCategory(action: string): ActivityLog["category"] {
+  const a = action.toLowerCase()
+  if (a.startsWith("book.")) return "book"
+  if (a.includes("user.") || a.includes("blocked") || a.includes("author.application")) return "admin"
+  if (a.includes("payment") || a.includes("payout") || a.includes("refund")) return "payment"
+  if (a.includes("subscription")) return "subscription"
+  if (a.includes("coupon")) return "coupon"
+  if (a.includes("auth") || a.includes("login")) return "auth"
+  return "system"
+}
+
+function mapPlatformActivityRow(row: Record<string, unknown>): ActivityLog {
+  const action = String(row.action ?? "")
+  const actor = row.actor as Record<string, unknown> | null | undefined
+  const subj = row.subject_user as Record<string, unknown> | null | undefined
+  const meta =
+    row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+      ? (row.metadata as Record<string, unknown>)
+      : {}
+  return {
+    id: String(row.id ?? ""),
+    userId: String(actor?.id ?? subj?.id ?? ""),
+    userName: String(actor?.name ?? subj?.name ?? "System"),
+    action,
+    category: mapActionToCategory(action),
+    metadata: {
+      ...meta,
+      entity_type: row.entity_type,
+      entity_id: row.entity_id,
+      ip_address: row.ip_address,
+    },
+    createdAt: String(row.created_at ?? ""),
+  }
+}
+
 // ── KPI Card ─────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, delta, icon: Icon, cls, href }: {
-  label: string; value: string; delta: string
+function KpiCard({ label, value, delta, isLive, icon: Icon, cls, href }: {
+  label: string; value: string; delta?: string; isLive?: boolean
   icon: React.ElementType; cls: string; href: string
 }) {
   return (
@@ -33,7 +70,11 @@ function KpiCard({ label, value, delta, icon: Icon, cls, href }: {
       </div>
       <div className="text-2xl font-bold font-serif text-foreground tracking-tight">{value}</div>
       <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
-      <div className="text-[11px] font-semibold text-emerald-500 mt-1">{delta}</div>
+      {isLive ? (
+        <div className="text-[11px] text-muted-foreground mt-1">Live data</div>
+      ) : delta ? (
+        <div className="text-[11px] font-semibold text-emerald-500 mt-1">{delta}</div>
+      ) : null}
     </Link>
   )
 }
@@ -56,6 +97,7 @@ function QuickLink({ href, icon: Icon, label, count, color }: {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AdminOverviewPage() {
+  const live = apiUrlConfigured()
   const [mockStats] = React.useState(() => {
     seedP4()
     seedStore()
@@ -64,19 +106,49 @@ export default function AdminOverviewPage() {
   const [apiMetrics, setApiMetrics] = React.useState<Record<string, number> | null>(null)
   const [chartRev, setChartRev] = React.useState<{ date: string; amount: number }[] | null>(null)
   const [logs] = React.useState(() => activityLogStore.getAll().slice(0, 6))
+  const [apiActivity, setApiActivity] = React.useState<ActivityLog[] | undefined>(undefined)
+  const [liveCycle, setLiveCycle] = React.useState<ReturnType<typeof apiRevenueCycleToRow> | null | undefined>(undefined)
   const [unreadN] = React.useState(() => notificationStore.getAdminUnread())
+  const [queuedBroadcasts, setQueuedBroadcasts] = React.useState(0)
   const [cycles] = React.useState(() => revenueCycleStore.getAll().slice(0, 1))
 
   React.useEffect(() => {
+    if (!live) return
+    let cancel = false
     adminApi
       .dashboard()
-      .then(setApiMetrics)
-      .catch(() => setApiMetrics(null))
+      .then(d => { if (!cancel) setApiMetrics(d) })
+      .catch(() => { if (!cancel) setApiMetrics(null) })
     adminApi
       .dashboardCharts(30)
-      .then(d => setChartRev(d.revenue_by_day))
-      .catch(() => setChartRev(null))
-  }, [])
+      .then(d => { if (!cancel) setChartRev(d.revenue_by_day) })
+      .catch(() => { if (!cancel) setChartRev(null) })
+    adminApi
+      .platformActivities({ page: "1", per_page: "6" })
+      .then(res => {
+        if (cancel) return
+        const rows = ((res.data ?? []) as Record<string, unknown>[]).map(mapPlatformActivityRow)
+        setApiActivity(rows)
+      })
+      .catch(() => { if (!cancel) setApiActivity([]) })
+    adminApi
+      .revenueCycles()
+      .then(res => {
+        if (cancel) return
+        const rows = (res.data as Record<string, unknown>[]).map(apiRevenueCycleToRow)
+        setLiveCycle(rows[0] ?? null)
+      })
+      .catch(() => { if (!cancel) setLiveCycle(null) })
+    adminApi
+      .notificationBroadcasts()
+      .then(res => {
+        if (cancel) return
+        const rows = (res.data ?? []) as { status?: string }[]
+        setQueuedBroadcasts(rows.filter(r => r.status === "queued" || r.status === "processing").length)
+      })
+      .catch(() => { if (!cancel) setQueuedBroadcasts(0) })
+    return () => { cancel = true }
+  }, [live])
 
   const stats = {
     totalUsers: apiMetrics?.users_total ?? mockStats.totalUsers,
@@ -109,18 +181,25 @@ export default function AdminOverviewPage() {
     system: "text-slate-500 bg-muted",
   }
 
-  const latestCycle = cycles[0]
+  const latestCycle = live ? liveCycle : cycles[0]
+  const activityRows = live ? apiActivity : logs
 
-  const cycleLabel = latestCycle
-    ? `${new Date(latestCycle.cycleStart).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(latestCycle.cycleEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-    : ""
+  const cycleLabel =
+    latestCycle && typeof latestCycle === "object"
+      ? `${new Date(latestCycle.cycleStart).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(latestCycle.cycleEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+      : ""
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-bold text-foreground">Overview</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-serif text-2xl font-bold text-foreground">Overview</h1>
+            {live && apiMetrics && (
+              <Badge variant="outline" className="text-[10px]">API</Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground mt-0.5">Platform health at a glance — {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
         </div>
         <Link href="/dashboard/admin/analytics">
@@ -132,10 +211,10 @@ export default function AdminOverviewPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Users"       value={stats.totalUsers.toLocaleString()}        delta="+8.4% this month"  icon={Users}      cls="bg-blue-50 dark:bg-blue-900/20 text-blue-500"   href="/dashboard/admin/users" />
-        <KpiCard label="Active Subscribers" value={stats.activeSubscribers.toLocaleString()} delta="+6.1% this month"  icon={TrendingUp} cls="bg-purple-50 dark:bg-purple-900/20 text-purple-500" href="/dashboard/admin/subscriptions" />
-        <KpiCard label="Monthly Revenue"   value={`$${stats.monthlyRevenue.toLocaleString()}`} delta="+18.2% vs last month" icon={DollarSign} cls="bg-green-50 dark:bg-green-900/20 text-green-500"  href="/dashboard/admin/revenue" />
-        <KpiCard label="Total Books"       value={stats.totalBooks.toLocaleString()}         delta="+12% this month"   icon={BookOpen}   cls="bg-amber-50 dark:bg-amber-900/20 text-brand"     href="/dashboard/admin/books" />
+        <KpiCard label="Total Users"       value={stats.totalUsers.toLocaleString()}        delta="+8.4% this month"  isLive={Boolean(live && apiMetrics)} icon={Users}      cls="bg-blue-50 dark:bg-blue-900/20 text-blue-500"   href="/dashboard/admin/users" />
+        <KpiCard label="Active Subscribers" value={stats.activeSubscribers.toLocaleString()} delta="+6.1% this month"  isLive={Boolean(live && apiMetrics)} icon={TrendingUp} cls="bg-purple-50 dark:bg-purple-900/20 text-purple-500" href="/dashboard/admin/subscriptions" />
+        <KpiCard label="Monthly Revenue"   value={`$${stats.monthlyRevenue.toLocaleString()}`} delta="+18.2% vs last month" isLive={Boolean(live && apiMetrics)} icon={DollarSign} cls="bg-green-50 dark:bg-green-900/20 text-green-500"  href="/dashboard/admin/revenue" />
+        <KpiCard label="Total Books"       value={stats.totalBooks.toLocaleString()}         delta="+12% this month"   isLive={Boolean(live && apiMetrics)} icon={BookOpen}   cls="bg-amber-50 dark:bg-amber-900/20 text-brand"     href="/dashboard/admin/books" />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
@@ -168,7 +247,7 @@ export default function AdminOverviewPage() {
         <div className="space-y-3">
           <h2 className="font-semibold text-sm text-foreground px-0.5">Quick Access</h2>
           <QuickLink href="/dashboard/admin/analytics"    icon={BarChart3}    label="Analytics"        color="bg-blue-50 dark:bg-blue-900/20 text-blue-500" />
-          <QuickLink href="/dashboard/admin/notifications" icon={Bell}         label="Notifications"    count={unreadN}  color="bg-amber-50 dark:bg-amber-900/20 text-brand" />
+          <QuickLink href="/dashboard/admin/notifications" icon={Bell}         label="Notifications"    count={live ? queuedBroadcasts : unreadN}  color="bg-amber-50 dark:bg-amber-900/20 text-brand" />
           <QuickLink href="/dashboard/admin/contact-messages" icon={Mail}     label="Contact inbox"    color="bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400" />
           <QuickLink href="/dashboard/admin/authors"      icon={Users}        label="Author Approvals" count={stats.pendingApprovals} color="bg-purple-50 dark:bg-purple-900/20 text-purple-500" />
           <QuickLink href="/dashboard/admin/cms"          icon={BarChart3}    label="CMS Builder"      color="bg-green-50 dark:bg-green-900/20 text-green-500" />
@@ -187,9 +266,11 @@ export default function AdminOverviewPage() {
             </Link>
           </div>
           <ul className="divide-y divide-border">
-            {logs.length === 0 ? (
+            {live && apiActivity === undefined ? (
+              <li className="px-5 py-8 text-center text-xs text-muted-foreground">Loading activity…</li>
+            ) : !activityRows?.length ? (
               <li className="px-5 py-8 text-center text-xs text-muted-foreground">No activity yet.</li>
-            ) : logs.map(log => {
+            ) : activityRows.map(log => {
               const Icon = CAT_ICONS[log.category] ?? AlertCircle
               const cls  = CAT_CLS[log.category]  ?? "text-muted-foreground bg-muted"
               return (
@@ -214,7 +295,9 @@ export default function AdminOverviewPage() {
             </Link>
           </div>
           <div className="p-5 space-y-4">
-            {latestCycle ? (
+            {live && liveCycle === undefined ? (
+              <div className="text-center py-6 text-xs text-muted-foreground">Loading revenue cycle…</div>
+            ) : latestCycle && typeof latestCycle === "object" ? (
               <>
                 <div className="flex items-center justify-between">
                   <div>

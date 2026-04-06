@@ -112,6 +112,8 @@ export interface TaxConfig {
   rate:        number // e.g. 0.075 for 7.5%
   appliesTo:   "all" | "paid"
   isEnabled:   boolean
+  /** Set when loaded from Laravel tax API */
+  countryCode?: string | null
 }
 
 // ── Phase 3 Types ─────────────────────────────────────────────────────────────

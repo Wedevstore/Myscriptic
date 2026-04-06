@@ -10,21 +10,76 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
-  ChevronLeft, Percent, Save, Info, CheckCircle2, ShoppingBag, Globe,
+  ChevronLeft, Percent, Save, Info, CheckCircle2, ShoppingBag, Globe, Download,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { apiUrlConfigured } from "@/lib/auth-mode"
+import { taxApi } from "@/lib/api"
 import { taxStore, seedStore, type TaxConfig } from "@/lib/store"
+
+function mapApiTax(row: Record<string, unknown>): TaxConfig {
+  return {
+    id: String(row.id ?? ""),
+    name: String(row.name ?? "Tax"),
+    rate: Number(row.rate ?? 0),
+    appliesTo: "all",
+    isEnabled: Boolean(row.is_enabled ?? false),
+    countryCode: row.country_code != null ? String(row.country_code) : null,
+  }
+}
+
+function escTaxCsv(s: string) {
+  return `"${String(s).replace(/"/g, '""')}"`
+}
+
+function exportTaxConfigsCsv(configs: TaxConfig[], live: boolean) {
+  const lines = [
+    live ? "# source: API" : "# source: local demo store",
+    ["id", "name", "rate_decimal", "rate_percent_display", "is_enabled", "country_code", "applies_to"].join(","),
+    ...configs.map(c =>
+      [
+        c.id,
+        c.name,
+        String(c.rate),
+        ((c.rate * 100).toFixed(4)),
+        c.isEnabled ? "1" : "0",
+        c.countryCode ?? "",
+        c.appliesTo,
+      ]
+        .map(escTaxCsv)
+        .join(","),
+    ),
+  ]
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(blob)
+  a.download = `tax-config-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function useTaxConfigs() {
+  const live = apiUrlConfigured()
   const [configs, setConfigs] = React.useState<TaxConfig[]>([])
-  const reload = React.useCallback(() => {
+  const reload = React.useCallback(async () => {
+    if (live) {
+      try {
+        const res = await taxApi.list()
+        setConfigs(((res.data ?? []) as Record<string, unknown>[]).map(mapApiTax))
+      } catch {
+        setConfigs([])
+      }
+      return
+    }
     seedStore()
     setConfigs(taxStore.getAll())
-  }, [])
-  React.useEffect(() => { reload() }, [reload])
-  return { configs, reload }
+  }, [live])
+  React.useEffect(() => {
+    void reload()
+  }, [reload])
+  return { configs, reload, live }
 }
 
 // ── sub-components ─────────────────────────────────────────────────────────────
@@ -32,13 +87,20 @@ function useTaxConfigs() {
 function TaxRow({
   config,
   onUpdate,
+  live,
 }: {
   config: TaxConfig
-  onUpdate: (id: string, patch: Partial<TaxConfig>) => void
+  onUpdate: (id: string, patch: Partial<TaxConfig>) => void | Promise<void>
+  live: boolean
 }) {
   const [rate, setRate] = React.useState(String((config.rate * 100).toFixed(2)))
   const [dirty, setDirty] = React.useState(false)
   const [saved, setSaved] = React.useState(false)
+
+  React.useEffect(() => {
+    setRate(String((config.rate * 100).toFixed(2)))
+    setDirty(false)
+  }, [config.id, config.rate])
 
   const handleRateChange = (v: string) => {
     setRate(v)
@@ -49,10 +111,15 @@ function TaxRow({
   const handleSave = () => {
     const parsed = parseFloat(rate)
     if (isNaN(parsed) || parsed < 0 || parsed > 100) return
-    onUpdate(config.id, { rate: parsed / 100 })
-    setDirty(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    void Promise.resolve(onUpdate(config.id, { rate: parsed / 100 }))
+      .then(() => {
+        setDirty(false)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+      })
+      .catch(() => {
+        /* parent may surface errors */
+      })
   }
 
   const exampleOrder  = 50
@@ -83,7 +150,18 @@ function TaxRow({
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Applies to: <span className="font-medium text-foreground capitalize">{config.appliesTo === "all" ? "all purchases" : "paid books only"}</span>
+              {live && config.countryCode ? (
+                <>
+                  Region: <span className="font-medium text-foreground font-mono">{config.countryCode}</span>
+                </>
+              ) : (
+                <>
+                  Applies to:{" "}
+                  <span className="font-medium text-foreground capitalize">
+                    {config.appliesTo === "all" ? "all purchases" : "paid books only"}
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -95,7 +173,7 @@ function TaxRow({
           <Switch
             id={`toggle-${config.id}`}
             checked={config.isEnabled}
-            onCheckedChange={v => onUpdate(config.id, { isEnabled: v })}
+            onCheckedChange={v => void onUpdate(config.id, { isEnabled: v })}
           />
         </div>
       </div>
@@ -170,24 +248,27 @@ function TaxRow({
         </div>
       </div>
 
-      {/* Applies-to toggle */}
-      <div className="mt-5 flex flex-wrap gap-3">
-        {(["all", "paid"] as const).map(scope => (
-          <button
-            key={scope}
-            onClick={() => onUpdate(config.id, { appliesTo: scope })}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm transition-all",
-              config.appliesTo === scope
-                ? "border-brand bg-brand/5 text-brand font-semibold"
-                : "border-border text-muted-foreground hover:border-brand/30"
-            )}
-          >
-            {scope === "all" ? <Globe size={14} /> : <ShoppingBag size={14} />}
-            {scope === "all" ? "All purchases" : "Paid books only"}
-          </button>
-        ))}
-      </div>
+      {/* Applies-to toggle (local demo store only; Laravel tax rows use region code) */}
+      {!live && (
+        <div className="mt-5 flex flex-wrap gap-3">
+          {(["all", "paid"] as const).map(scope => (
+            <button
+              key={scope}
+              type="button"
+              onClick={() => void onUpdate(config.id, { appliesTo: scope })}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm transition-all",
+                config.appliesTo === scope
+                  ? "border-brand bg-brand/5 text-brand font-semibold"
+                  : "border-border text-muted-foreground hover:border-brand/30"
+              )}
+            >
+              {scope === "all" ? <Globe size={14} /> : <ShoppingBag size={14} />}
+              {scope === "all" ? "All purchases" : "Paid books only"}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -195,11 +276,21 @@ function TaxRow({
 // ── page ──────────────────────────────────────────────────────────────────────
 
 function TaxContent() {
-  const { configs, reload } = useTaxConfigs()
+  const { configs, reload, live } = useTaxConfigs()
 
-  const handleUpdate = (id: string, patch: Partial<TaxConfig>) => {
+  const handleUpdate = async (id: string, patch: Partial<TaxConfig>) => {
+    if (live) {
+      const body: Record<string, unknown> = {}
+      if (patch.rate !== undefined) body.rate = patch.rate
+      if (patch.isEnabled !== undefined) body.is_enabled = patch.isEnabled
+      if (patch.name !== undefined) body.name = patch.name
+      if (patch.countryCode !== undefined) body.country_code = patch.countryCode
+      await taxApi.update(id, body)
+      await reload()
+      return
+    }
     taxStore.update(id, patch)
-    reload()
+    await reload()
   }
 
   const activeCount = configs.filter(c => c.isEnabled).length
@@ -216,10 +307,24 @@ function TaxContent() {
         <span className="text-muted-foreground">/</span>
         <h1 className="font-serif text-2xl font-bold text-foreground">Tax Configuration</h1>
       </div>
-      <p className="text-sm text-muted-foreground mb-8">
-        Configure VAT, GST, and other tax rates applied at checkout.
-        <span className="text-brand font-medium"> {activeCount} of {configs.length} enabled.</span>
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
+        <p className="text-sm text-muted-foreground">
+          Configure VAT, GST, and other tax rates applied at checkout.
+          <span className="text-brand font-medium"> {activeCount} of {configs.length} enabled.</span>
+        </p>
+        {configs.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs shrink-0"
+            onClick={() => exportTaxConfigsCsv(configs, live)}
+          >
+            <Download size={12} />
+            Export CSV
+          </Button>
+        )}
+      </div>
 
       {/* Info banner */}
       <div className="flex items-start gap-3 p-4 bg-brand/5 border border-brand/20 rounded-xl mb-8">
@@ -238,12 +343,12 @@ function TaxContent() {
             <Percent size={32} className="mx-auto text-muted-foreground mb-3" />
             <p className="font-semibold text-foreground">No tax configurations found</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Seed the store to load the default VAT and GST settings.
+              {live ? "No tax rows returned from the API." : "Seed the store to load the default VAT and GST settings."}
             </p>
           </div>
         ) : (
           configs.map(config => (
-            <TaxRow key={config.id} config={config} onUpdate={handleUpdate} />
+            <TaxRow key={config.id} config={config} onUpdate={handleUpdate} live={live} />
           ))
         )}
       </div>
