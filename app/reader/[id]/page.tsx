@@ -535,6 +535,8 @@ function ReaderContent() {
   const horizontalScrollRef = React.useRef<HTMLDivElement>(null)
   const readerHelpPanelRef = React.useRef<HTMLDivElement>(null)
   const readerHelpCloseRef = React.useRef<HTMLButtonElement>(null)
+  const readerTocPanelRef = React.useRef<HTMLDivElement>(null)
+  const readerTocCloseRef = React.useRef<HTMLButtonElement>(null)
   const readingLayoutRef = React.useRef<ReadingLayout>(readingLayout)
   readingLayoutRef.current = readingLayout
   const currentPageRef = React.useRef(currentPage)
@@ -819,6 +821,53 @@ function ReaderContent() {
     document.addEventListener("keydown", onTab)
     return () => document.removeEventListener("keydown", onTab)
   }, [readerHelpOpen])
+
+  React.useEffect(() => {
+    if (!showToc) return
+    const previous = document.activeElement as HTMLElement | null
+    const id = requestAnimationFrame(() => {
+      readerTocCloseRef.current?.focus()
+    })
+    return () => {
+      cancelAnimationFrame(id)
+      if (previous && document.body.contains(previous) && typeof previous.focus === "function") {
+        try {
+          previous.focus()
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }, [showToc])
+
+  React.useEffect(() => {
+    if (!showToc) return
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return
+      const panel = readerTocPanelRef.current
+      if (!panel) return
+      const nodes = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+        )
+      ).filter(el => !el.closest("[aria-hidden='true']"))
+      if (nodes.length === 0) return
+      const first = nodes[0]
+      const last = nodes[nodes.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey) {
+        if (active === first) {
+          e.preventDefault()
+          last.focus()
+        }
+      } else if (active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener("keydown", onTab)
+    return () => document.removeEventListener("keydown", onTab)
+  }, [showToc])
 
   React.useEffect(() => {
     const locked = readerHelpOpen || showToc
@@ -1951,6 +2000,7 @@ function ReaderContent() {
           aria-labelledby="reader-toc-title"
         >
           <div
+            ref={readerTocPanelRef}
             className={cn("absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] shadow-2xl overflow-y-auto", readerTocAside(theme))}
             onClick={e => e.stopPropagation()}
           >
@@ -1971,7 +2021,12 @@ function ReaderContent() {
               >
                 Table of Contents
               </h3>
-              <button type="button" onClick={() => setShowToc(false)} aria-label="Close contents">
+              <button
+                ref={readerTocCloseRef}
+                type="button"
+                onClick={() => setShowToc(false)}
+                aria-label="Close contents"
+              >
                 <X
                   size={18}
                   className={cn(
