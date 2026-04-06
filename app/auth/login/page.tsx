@@ -53,16 +53,6 @@ export default function LoginPage() {
     else router.push(afterLogin)
   }
 
-  const fillDemo = (role: "admin" | "author" | "user") => {
-    const map = {
-      admin: { email: "admin@myscriptic.com", password: "admin123" },
-      author: { email: "author@myscriptic.com", password: "author123" },
-      user: { email: "reader@myscriptic.com", password: "reader123" },
-    }
-    setForm(map[role])
-    setError("")
-  }
-
   return (
     <div className="min-h-screen flex">
       {/* Left Panel — Branding */}
@@ -120,25 +110,6 @@ export default function LoginPage() {
           <div className="mb-8">
             <h2 className="font-serif text-3xl font-bold text-foreground mb-1">Welcome back</h2>
             <p className="text-muted-foreground">Sign in to continue reading</p>
-          </div>
-
-          {/* Demo credential shortcuts */}
-          <div className="mb-6 p-4 bg-muted rounded-xl border border-border">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              Demo Accounts (click to fill)
-            </p>
-            <div className="flex gap-2">
-              {(["admin", "author", "user"] as const).map(role => (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => fillDemo(role)}
-                  className="flex-1 px-2 py-1.5 text-xs font-medium rounded-lg bg-background border border-border hover:border-brand hover:text-brand transition-colors capitalize"
-                >
-                  {role}
-                </button>
-              ))}
-            </div>
           </div>
 
           {error && (
