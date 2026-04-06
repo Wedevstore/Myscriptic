@@ -21,11 +21,33 @@ import { mapAuthorCourseCardFromApi } from "@/lib/courses-from-api"
 import { CoverImage } from "@/components/ui/cover-image"
 import { Badge } from "@/components/ui/badge"
 import { formatCourseAccessLabel } from "@/lib/course-access"
+import { cn } from "@/lib/utils"
+
+function CourseCardSkeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col rounded-2xl border border-border bg-card overflow-hidden animate-pulse",
+        className
+      )}
+      aria-hidden
+    >
+      <div className="aspect-video bg-muted" />
+      <div className="p-6 flex-1 flex flex-col gap-3">
+        <div className="h-6 bg-muted rounded-md w-[85%]" />
+        <div className="h-3 bg-muted rounded-md w-[45%]" />
+        <div className="h-14 bg-muted rounded-md w-full mt-1" />
+        <div className="h-4 bg-muted rounded-md w-24 mt-3" />
+      </div>
+    </div>
+  )
+}
 
 function CoursesGrid() {
   const [courses, setCourses] = React.useState<AuthorCourse[]>([])
   const [query, setQuery] = React.useState("")
   const [debouncedQ, setDebouncedQ] = React.useState("")
+  const [listLoading, setListLoading] = React.useState(() => laravelCoursesEnabled())
 
   React.useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(query.trim()), 300)
@@ -35,12 +57,15 @@ function CoursesGrid() {
   React.useEffect(() => {
     const refresh = () => {
       if (laravelCoursesEnabled()) {
+        setListLoading(true)
         void coursesPublicApi
           .list(debouncedQ ? { q: debouncedQ } : undefined)
           .then(res => setCourses(res.data.map(mapAuthorCourseCardFromApi)))
           .catch(() => setCourses([]))
+          .finally(() => setListLoading(false))
         return
       }
+      setListLoading(false)
       seedAuthorCourses()
       let list = authorCourseStore.getPublished()
       if (debouncedQ) {
@@ -83,7 +108,25 @@ function CoursesGrid() {
     </div>
   )
 
-  if (courses.length === 0) {
+  if (listLoading && courses.length === 0) {
+    return (
+      <div className="space-y-8">
+        {searchBar}
+        <div
+          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8"
+          role="status"
+          aria-live="polite"
+          aria-label="Loading courses"
+        >
+          {Array.from({ length: 6 }, (_, i) => (
+            <CourseCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (!listLoading && courses.length === 0) {
     const filtered = debouncedQ.length > 0
     return (
       <div className="space-y-8">
@@ -115,7 +158,13 @@ function CoursesGrid() {
   return (
     <div className="space-y-8">
       {searchBar}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div
+        className={cn(
+          "grid sm:grid-cols-2 lg:grid-cols-3 gap-8 transition-opacity duration-200",
+          listLoading && "opacity-70"
+        )}
+        aria-busy={listLoading}
+      >
       {courses.map(course => (
         <Link
           key={course.id}
