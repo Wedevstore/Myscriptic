@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { serverFetchJson, siteUrl } from "@/lib/server-api"
+import { MOCK_BOOKS } from "@/lib/mock-data"
 
 type BookPayload = {
   data: {
@@ -10,6 +11,17 @@ type BookPayload = {
   }
 }
 
+function mockMetaForId(id: string): BookPayload["data"] | null {
+  const m = MOCK_BOOKS.find(b => b.id === id)
+  if (!m) return null
+  return {
+    title: m.title,
+    description: null,
+    author: m.author,
+    coverUrl: m.coverUrl,
+  }
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -17,7 +29,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
   const json = await serverFetchJson<BookPayload>(`/books/${id}`, 300)
-  const book = json?.data
+  const book = json?.data ?? mockMetaForId(id)
   const site = siteUrl()
 
   if (!book) {

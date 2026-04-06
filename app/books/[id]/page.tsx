@@ -63,6 +63,17 @@ const BOOK_EXTRAS: Record<string, {
     readCount: 12400,
     completionRate: 72,
   },
+  bk_016: {
+    description:
+      "Practical, cost-conscious guidance for shipping and running containers without overspending on cloud bills. Covers image slimming, registry choices, CI caching, and sane defaults for small teams.",
+    pages: 288,
+    language: "English",
+    publisher: "MyScriptic Press",
+    publishedAt: "January 2026",
+    isbn: "978-3-16-148416-2",
+    readCount: 1520,
+    completionRate: 64,
+  },
 }
 
 function StarFill({ value }: { value: number }) {
@@ -102,33 +113,50 @@ function ReviewCard({ review }: { review: ReviewItem }) {
   )
 }
 
+function routeBookId(params: { id?: string | string[] } | null): string {
+  const raw = params?.id
+  if (typeof raw === "string" && raw.length > 0) return raw
+  if (Array.isArray(raw) && raw[0]) return raw[0]
+  return ""
+}
+
 function BookDetailContent() {
-  const params  = useParams<{ id: string }>()
+  const params  = useParams<{ id?: string | string[] }>()
   const router  = useRouter()
   const { isAuthenticated, user } = useAuth()
   const phase2 = laravelPhase2Enabled()
   const apiWishlist = apiUrlConfigured() && laravelAuthEnabled() && isAuthenticated
+  const liveBooks = apiUrlConfigured()
+
+  const bookId = routeBookId(params)
 
   const [remote, setRemote] = React.useState<BookCardData | null>(null)
   const [remoteDesc, setRemoteDesc] = React.useState<string | null>(null)
   const [remoteSample, setRemoteSample] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    const id = params?.id
-    if (!id) return
+    if (!bookId) return
     setRemoteSample(null)
+    if (!liveBooks) {
+      setRemote(null)
+      setRemoteDesc(null)
+      return
+    }
     booksApi
-      .get(id)
+      .get(bookId)
       .then(res => {
         const d = res.data as ApiBookRecord & { description?: string | null }
         setRemote(apiBookToCard(d))
         setRemoteDesc(d.description ?? null)
         setRemoteSample(d.sampleExcerpt ?? null)
       })
-      .catch(() => {})
-  }, [params?.id])
+      .catch(() => {
+        setRemote(null)
+        setRemoteDesc(null)
+      })
+  }, [bookId, liveBooks])
 
-  const book = remote ?? MOCK_BOOKS.find(b => b.id === params.id) ?? MOCK_BOOKS[0]
+  const book = remote ?? MOCK_BOOKS.find(b => b.id === bookId) ?? MOCK_BOOKS[0]
   const extras = BOOK_EXTRAS[book.id] ?? BOOK_EXTRAS["bk_001"]
   const descriptionText = (remoteDesc ?? extras.description).trim()
   const openingExcerpt = resolveBookSampleExcerpt(book.id, remoteSample)
@@ -145,17 +173,20 @@ function BookDetailContent() {
   React.useEffect(() => {
     const fb = MOCK_BOOKS.filter(b => b.category === book.category && b.id !== book.id).slice(0, 6)
     setRelated(fb)
+    if (!liveBooks) return
     let cancelled = false
     booksApi
       .list({ category: book.category, per_page: "12" })
       .then(res => {
         if (cancelled) return
-        const rows = (res.data as ApiBookRecord[]).map(apiBookToCard).filter(b => b.id !== book.id).slice(0, 6)
+        const raw = res?.data
+        const list = Array.isArray(raw) ? raw : []
+        const rows = list.map(row => apiBookToCard(row as ApiBookRecord)).filter(b => b.id !== book.id).slice(0, 6)
         if (rows.length) setRelated(rows)
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [book.id, book.category])
+  }, [book.id, book.category, liveBooks])
 
   React.useEffect(() => {
     setWishlisted(wishlistStore.has(book.id))
