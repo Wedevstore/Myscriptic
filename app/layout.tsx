@@ -2,6 +2,24 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import './globals.css'
 
+const DEFAULT_SITE_URL = 'https://myscriptic.com'
+
+function resolveMetadataBase(): URL {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  if (!raw) return new URL(DEFAULT_SITE_URL)
+  const hasScheme = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(raw)
+  const candidate = hasScheme
+    ? raw
+    : /^localhost(:\d+)?$/i.test(raw) || /^127\.0\.0\.1(:\d+)?$/.test(raw)
+      ? `http://${raw}`
+      : `https://${raw}`
+  try {
+    return new URL(candidate)
+  } catch {
+    return new URL(DEFAULT_SITE_URL)
+  }
+}
+
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
@@ -15,7 +33,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://myscriptic.com"),
+  metadataBase: resolveMetadataBase(),
   title: {
     default: 'MyScriptic — Read, Discover & Earn',
     template: '%s | MyScriptic',
