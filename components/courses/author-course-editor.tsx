@@ -8,13 +8,31 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { authorCourseStore, seedAuthorCourses, type AuthorCourseLesson } from "@/lib/author-courses-store"
+import { authorCourseStore, seedAuthorCourses, type AuthorCourse, type AuthorCourseLesson } from "@/lib/author-courses-store"
+import { laravelCoursesEnabled } from "@/lib/auth-mode"
+import { authorCoursesApi, type AuthorCourseWritePayload } from "@/lib/api"
+import { mapAuthorCourseDetailFromApi } from "@/lib/courses-from-api"
 import { isAllowedVideoUrl } from "@/lib/video-embed"
 import { slugify } from "@/lib/slugify"
-import { ChevronLeft, Plus, Trash2, ChevronUp, ChevronDown, Link2, AlertCircle } from "lucide-react"
+import type { CourseAccessType } from "@/lib/course-access"
+import {
+  ChevronLeft, Plus, Trash2, ChevronUp, ChevronDown, Link2, AlertCircle,
+  Lock, Globe, Check, CreditCard,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type DraftLesson = { title: string; videoUrl: string; id?: string }
+
+const COURSE_ACCESS_OPTIONS: {
+  value: CourseAccessType
+  label: string
+  desc: string
+  icon: React.ElementType
+}[] = [
+  { value: "FREE", label: "Free", desc: "Anyone can watch for free", icon: Globe },
+  { value: "SUBSCRIPTION", label: "Subscription", desc: "Included in reader plans", icon: Check },
+  { value: "PAID", label: "One-time Purchase", desc: "Learners pay once to access", icon: CreditCard },
+]
 
 export function AuthorCourseEditor({
   courseId,
@@ -32,31 +50,77 @@ export function AuthorCourseEditor({
   const [slugTouched, setSlugTouched] = React.useState(false)
   const [description, setDescription] = React.useState("")
   const [thumbnailUrl, setThumbnailUrl] = React.useState("")
+  const [accessType, setAccessType] = React.useState<CourseAccessType>("SUBSCRIPTION")
+  const [price, setPrice] = React.useState("")
+  const [currency, setCurrency] = React.useState("USD")
   const [published, setPublished] = React.useState(false)
   const [lessons, setLessons] = React.useState<DraftLesson[]>([{ title: "", videoUrl: "" }])
   const [error, setError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
+  const [loadingCourse, setLoadingCourse] = React.useState(() => Boolean(courseId && laravelCoursesEnabled()))
 
-  React.useEffect(() => {
-    seedAuthorCourses()
-    if (!courseId) return
-    const c = authorCourseStore.getById(courseId)
-    if (!c || c.authorId !== authorId) {
-      router.replace("/dashboard/author/courses")
-      return
-    }
+  const applyLoadedCourse = React.useCallback((c: AuthorCourse) => {
     setTitle(c.title)
     setSlug(c.slug)
     setSlugTouched(true)
     setDescription(c.description)
     setThumbnailUrl(c.thumbnailUrl ?? "")
+    setAccessType(c.accessType)
+    setPrice(c.price != null && Number.isFinite(c.price) ? String(c.price) : "")
+    setCurrency(c.currency || "USD")
     setPublished(c.published)
     setLessons(
       [...c.lessons]
         .sort((a, b) => a.sortOrder - b.sortOrder)
         .map(l => ({ id: l.id, title: l.title, videoUrl: l.videoUrl }))
     )
-  }, [courseId, authorId, router])
+  }, [])
+
+  React.useEffect(() => {
+    if (!courseId) {
+      setLoadingCourse(false)
+      return
+    }
+
+    if (laravelCoursesEnabled()) {
+      let alive = true
+      setLoadingCourse(true)
+      void authorCoursesApi
+        .list()
+        .then(res => {
+          if (!alive) return
+          const row = res.data.find(c => c.id === courseId)
+          if (!row) {
+            router.replace("/dashboard/author/courses")
+            return
+          }
+          const c = mapAuthorCourseDetailFromApi(row)
+          if (String(c.authorId) !== String(authorId)) {
+            router.replace("/dashboard/author/courses")
+            return
+          }
+          applyLoadedCourse(c)
+        })
+        .catch(() => {
+          if (alive) router.replace("/dashboard/author/courses")
+        })
+        .finally(() => {
+          if (alive) setLoadingCourse(false)
+        })
+      return () => {
+        alive = false
+      }
+    }
+
+    seedAuthorCourses()
+    const c = authorCourseStore.getById(courseId)
+    if (!c || String(c.authorId) !== String(authorId)) {
+      router.replace("/dashboard/author/courses")
+      return
+    }
+    applyLoadedCourse(c)
+    setLoadingCourse(false)
+  }, [courseId, authorId, router, applyLoadedCourse])
 
   React.useEffect(() => {
     if (isEdit || slugTouched) return
@@ -80,7 +144,7 @@ export function AuthorCourseEditor({
     setLessons(prev => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)))
   }
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     const t = title.trim()
@@ -88,6 +152,14 @@ export function AuthorCourseEditor({
       setError("Title is required.")
       return
     }
+    if (accessType === "PAID") {
+      const p = parseFloat(price)
+      if (!Number.isFinite(p) || p < 0.99) {
+        setError("Set a valid price (minimum 0.99) for one-time purchase courses.")
+        return
+      }
+    }
+
     const filled = lessons.filter(l => l.title.trim() || l.videoUrl.trim())
     if (filled.length === 0) {
       setError("Add at least one lesson with a title and a YouTube or Vimeo URL.")
@@ -111,8 +183,32 @@ export function AuthorCourseEditor({
       }
     }
 
+    const basePayload: AuthorCourseWritePayload = {
+      title: t,
+      description: description.trim() || null,
+      thumbnail_url: thumbnailUrl.trim() || null,
+      published,
+      access_type: accessType,
+      price: accessType === "PAID" ? parseFloat(price) : null,
+      currency: accessType === "PAID" ? currency || "USD" : "USD",
+      lessons: filled.map(l => ({ title: l.title.trim(), video_url: l.videoUrl.trim() })),
+      ...(slugTouched && slug.trim() ? { slug: slugify(slug.trim()) } : {}),
+    }
+
     setBusy(true)
     try {
+      if (laravelCoursesEnabled()) {
+        if (isEdit && courseId) {
+          await authorCoursesApi.update(courseId, basePayload)
+        } else {
+          await authorCoursesApi.create(basePayload)
+        }
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("author-courses-changed"))
+        router.push("/dashboard/author/courses")
+        router.refresh()
+        return
+      }
+
       if (isEdit && courseId) {
         const mapped: AuthorCourseLesson[] = filled.map((l, idx) => ({
           id: l.id ?? `l_${Math.random().toString(36).slice(2, 10)}`,
@@ -125,6 +221,9 @@ export function AuthorCourseEditor({
           description: description.trim(),
           thumbnailUrl: thumbnailUrl.trim() || null,
           published,
+          accessType,
+          price: accessType === "PAID" ? parseFloat(price) : null,
+          currency: accessType === "PAID" ? currency || "USD" : "USD",
           lessons: mapped,
           ...(slug.trim() ? { slug: slugify(slug.trim()) } : {}),
         })
@@ -136,6 +235,9 @@ export function AuthorCourseEditor({
           description: description.trim(),
           thumbnailUrl: thumbnailUrl.trim() || null,
           published,
+          accessType,
+          price: accessType === "PAID" ? parseFloat(price) : null,
+          currency: accessType === "PAID" ? currency || "USD" : "USD",
           slugBase: slugTouched && slug.trim() ? slug.trim() : null,
           lessons: filled.map(l => ({
             title: l.title.trim(),
@@ -145,9 +247,19 @@ export function AuthorCourseEditor({
       }
       router.push("/dashboard/author/courses")
       router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save course.")
     } finally {
       setBusy(false)
     }
+  }
+
+  if (loadingCourse) {
+    return (
+      <div className="flex justify-center py-20 max-w-3xl">
+        <div className="w-10 h-10 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -221,12 +333,83 @@ export function AuthorCourseEditor({
           />
           <p className="text-[11px] text-muted-foreground">Shown on cards. Use any image CDN; not a video file.</p>
         </div>
-        <div className="flex items-center gap-3 pt-2">
-          <Switch id="c-pub" checked={published} onCheckedChange={setPublished} />
-          <Label htmlFor="c-pub" className="text-sm cursor-pointer">
-            Published — visible on /courses and homepage when the section is on
-          </Label>
+      </div>
+
+      <section className="bg-card border border-border rounded-xl p-6 space-y-5">
+        <h2 className="font-semibold text-foreground flex items-center gap-2">
+          <Lock size={16} className="text-brand" /> Access &amp; Pricing
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {COURSE_ACCESS_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setAccessType(opt.value)}
+              className={cn(
+                "flex flex-col items-start gap-2 p-4 rounded-xl border-2 transition-all text-left",
+                accessType === opt.value ? "border-brand bg-brand/5" : "border-border hover:border-brand/20"
+              )}
+            >
+              <opt.icon
+                size={18}
+                className={accessType === opt.value ? "text-brand" : "text-muted-foreground"}
+              />
+              <div>
+                <div
+                  className={cn(
+                    "text-xs font-semibold",
+                    accessType === opt.value ? "text-brand" : "text-foreground"
+                  )}
+                >
+                  {opt.label}
+                </div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{opt.desc}</div>
+              </div>
+            </button>
+          ))}
         </div>
+
+        {accessType === "PAID" && (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="c-price">
+                Price <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="c-price"
+                type="number"
+                min="0.99"
+                step="0.01"
+                value={price}
+                onChange={e => setPrice(e.target.value)}
+                placeholder="9.99"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-currency">Currency</Label>
+              <select
+                id="c-currency"
+                value={currency}
+                onChange={e => setCurrency(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {["USD", "NGN", "GHS", "KES"].map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-6 py-4">
+        <Switch id="c-pub" checked={published} onCheckedChange={setPublished} />
+        <Label htmlFor="c-pub" className="text-sm cursor-pointer">
+          Published — visible on /courses and homepage when the section is on
+        </Label>
       </div>
 
       <div className="space-y-4">

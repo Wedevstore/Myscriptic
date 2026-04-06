@@ -12,7 +12,7 @@ import {
   LayoutDashboard, Users, BookOpen, DollarSign, BarChart3,
   Bell, Tag, FileText, Settings, Shield, ChevronDown, LogOut,
   Menu, X, Newspaper, Image, Globe, Receipt, TrendingUp,
-  UserCheck, Zap, Percent, Hash, Lock, ChevronRight,
+  UserCheck, Zap, Percent, Hash, Lock, ChevronRight, GraduationCap,
 } from "lucide-react"
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
@@ -39,6 +39,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
       { label: "Banners",       href: "/dashboard/admin/banners",     icon: Image },
       { label: "CMS Pages",     href: "/dashboard/admin/pages",       icon: Globe },
       { label: "Books",         href: "/dashboard/admin/books",       icon: BookOpen },
+      { label: "Author courses", href: "/dashboard/admin/author-courses", icon: GraduationCap },
     ],
   },
   {

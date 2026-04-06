@@ -14,7 +14,7 @@ import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import {
   TrendingUp, Sparkles, Flame, BookOpen, Headphones,
-  Star, Users, ArrowRight, Globe, Award, Zap,
+  Star, Users, ArrowRight, Globe, Award, Zap, GraduationCap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -308,6 +308,25 @@ function DiscoverContent() {
             </Link>
           ))}
         </div>
+
+        <section className="mb-10 rounded-2xl border border-brand/25 bg-gradient-to-r from-brand/10 via-brand/5 to-transparent p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex gap-4 min-w-0">
+            <div className="w-12 h-12 rounded-xl bg-brand/15 flex items-center justify-center shrink-0">
+              <GraduationCap className="h-6 w-6 text-brand" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-serif text-lg font-bold text-foreground">Learn from authors</h2>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                Browse video courses with lessons streamed from YouTube or Vimeo — no uploads on MyScriptic.
+              </p>
+            </div>
+          </div>
+          <Button asChild className="bg-brand hover:bg-brand-dark text-primary-foreground shrink-0 gap-2">
+            <Link href="/courses">
+              Explore courses <ArrowRight size={14} />
+            </Link>
+          </Button>
+        </section>
 
         {/* Tabs: Trending / New / Free / Audio */}
         <div className="mb-8">

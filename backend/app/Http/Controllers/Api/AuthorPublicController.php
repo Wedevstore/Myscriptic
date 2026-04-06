@@ -30,6 +30,7 @@ class AuthorPublicController extends Controller
                 'avatar' => $author->avatar ?? '',
                 'books' => (int) $author->books_count,
                 'followers' => (int) $author->followers_count,
+                'courses' => CoursePublicController::coursesForAuthor($author),
             ],
         ]);
     }

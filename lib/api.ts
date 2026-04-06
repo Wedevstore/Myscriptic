@@ -10,6 +10,8 @@
  * Replace every TODO_MOCK comment with real fetch once Laravel is live.
  */
 
+import type { ApiCourseCard, ApiCourseDetail } from "@/lib/courses-from-api"
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.myscriptic.com/api"
 
 function getToken(): string | null {
@@ -21,6 +23,24 @@ function getToken(): string | null {
   } catch {
     return null
   }
+}
+
+/** Prefer Laravel `errors` bag on 422 when the top-level message is generic. */
+function messageFromErrorPayload(err: unknown, fallback: string): string {
+  if (!err || typeof err !== "object") return fallback
+  const o = err as Record<string, unknown>
+  const top = o.message
+  const topStr = typeof top === "string" ? top : ""
+  const errors = o.errors
+  if (errors && typeof errors === "object" && errors !== null) {
+    for (const v of Object.values(errors as Record<string, unknown>)) {
+      if (Array.isArray(v) && v.length > 0 && typeof v[0] === "string") {
+        return v[0]
+      }
+    }
+  }
+  if (topStr && topStr !== "The given data was invalid.") return topStr
+  return topStr || fallback
 }
 
 async function request<T>(
@@ -39,10 +59,7 @@ async function request<T>(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
-    const msg =
-      typeof err === "object" && err !== null && "message" in err
-        ? String((err as { message: unknown }).message)
-        : res.statusText
+    const msg = messageFromErrorPayload(err, res.statusText)
     throw new Error(msg || "API error")
   }
 
@@ -246,8 +263,72 @@ export const authorsApi = {
 
   get: (id: string) =>
     request<{
-      data: { id: string; name: string; avatar: string; books: number; followers: number }
+      data: {
+        id: string
+        name: string
+        avatar: string
+        books: number
+        followers: number
+        courses?: {
+          slug: string
+          title: string
+          lesson_count: number
+          thumbnail_url: string | null
+          access_type?: string
+          price?: number | null
+          currency?: string | null
+        }[]
+      }
     }>(`/authors/${id}`),
+}
+
+/** Public published courses (GET /courses, GET /courses/{slug}). */
+export const coursesPublicApi = {
+  list: (params?: { q?: string }) => {
+    const qRaw = params?.q?.trim() ?? ""
+    const q = qRaw.length > 120 ? qRaw.slice(0, 120) : qRaw
+    const qs =
+      q !== ""
+        ? `?${new URLSearchParams({ q }).toString()}`
+        : ""
+    return request<{
+      data: ApiCourseCard[]
+    }>(`/courses${qs}`)
+  },
+  get: (slug: string, opts?: { preview?: boolean }) => {
+    const qs = opts?.preview ? "?preview=1" : ""
+    return request<{ data: ApiCourseDetail }>(`/courses/${encodeURIComponent(slug)}${qs}`)
+  },
+}
+
+export type AuthorCourseWritePayload = {
+  title: string
+  slug?: string | null
+  description?: string | null
+  thumbnail_url?: string | null
+  published?: boolean
+  access_type?: "FREE" | "PAID" | "SUBSCRIPTION"
+  price?: number | null
+  currency?: string | null
+  lessons: { title: string; video_url: string }[]
+}
+
+/** Authenticated author CRUD (GET/POST /author/courses, PUT/DELETE …/{id}). */
+export const authorCoursesApi = {
+  list: () =>
+    request<{ data: ApiCourseDetail[] }>("/author/courses"),
+  create: (body: AuthorCourseWritePayload) =>
+    request<{ data: ApiCourseDetail }>("/author/courses", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  update: (id: string, body: Partial<AuthorCourseWritePayload>) =>
+    request<{ data: ApiCourseDetail }>(`/author/courses/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  delete: (id: string) =>
+    request<void>(`/author/courses/${encodeURIComponent(id)}`, { method: "DELETE" }),
 }
 
 export const authorFollowsApi = {
@@ -411,6 +492,26 @@ export const adminApi = {
     }),
 
   pendingBooks: () => request<{ data: unknown[] }>("/admin/books/pending"),
+
+  authorCourses: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : ""
+    return request<{
+      data: {
+        id: string
+        slug: string
+        title: string
+        published: boolean
+        access_type: string
+        price: number | null
+        currency: string | null
+        author: { id: string; name: string | null; email: string | null }
+        lessons_count: number
+        updated_at: string | null
+      }[]
+      meta: { current_page: number; last_page: number; per_page: number; total: number }
+    }>(`/admin/author-courses${qs}`)
+  },
+
   approveBook: (id: string) =>
     request<{ data: unknown }>(`/admin/books/${id}/approve`, { method: "POST" }),
   rejectBook: (id: string, reason: string) =>

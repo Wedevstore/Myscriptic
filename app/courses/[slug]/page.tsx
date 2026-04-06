@@ -12,11 +12,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { VideoEmbedFrame } from "@/components/courses/video-embed-frame"
 import { seedAuthorCourses, authorCourseStore, type AuthorCourse } from "@/lib/author-courses-store"
+import { laravelCoursesEnabled } from "@/lib/auth-mode"
+import { coursesPublicApi } from "@/lib/api"
+import { mapAuthorCourseDetailFromApi } from "@/lib/courses-from-api"
 import { isAllowedVideoUrl } from "@/lib/video-embed"
 import {
-  GraduationCap, ChevronLeft, ListVideo, Eye, Lock, ExternalLink,
+  GraduationCap, ChevronLeft, ListVideo, Eye, Lock, ExternalLink, CreditCard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatCourseAccessLabel } from "@/lib/course-access"
 
 function sortLessons(c: AuthorCourse) {
   return [...c.lessons].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -31,23 +35,48 @@ function CourseSlugInner() {
 
   const [course, setCourse] = React.useState<AuthorCourse | null | undefined>(undefined)
   const [activeIdx, setActiveIdx] = React.useState(0)
+  const fromApi = laravelCoursesEnabled()
 
   React.useEffect(() => {
-    seedAuthorCourses()
-    const refresh = () => {
-      const c = authorCourseStore.getBySlug(slug)
-      setCourse(c ?? null)
+    if (!slug) return
+
+    if (!fromApi) {
+      seedAuthorCourses()
+      const refresh = () => {
+        const c = authorCourseStore.getBySlug(slug)
+        setCourse(c ?? null)
+      }
+      refresh()
+      window.addEventListener("author-courses-changed", refresh)
+      return () => window.removeEventListener("author-courses-changed", refresh)
     }
-    refresh()
-    window.addEventListener("author-courses-changed", refresh)
-    return () => window.removeEventListener("author-courses-changed", refresh)
-  }, [slug])
+
+    if (preview && authLoading) {
+      setCourse(undefined)
+      return
+    }
+
+    let cancelled = false
+    setCourse(undefined)
+    void coursesPublicApi
+      .get(slug, preview ? { preview: true } : {})
+      .then(({ data }) => {
+        if (!cancelled) setCourse(mapAuthorCourseDetailFromApi(data))
+      })
+      .catch(() => {
+        if (!cancelled) setCourse(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [slug, preview, authLoading, fromApi])
 
   const canPreview =
     preview &&
     user &&
     course &&
-    course.authorId === user.id
+    String(course.authorId) === String(user.id)
 
   const visible =
     course &&
@@ -57,7 +86,12 @@ function CourseSlugInner() {
     setActiveIdx(0)
   }, [slug, course?.id])
 
-  if (course === undefined || authLoading) {
+  const pageLoading =
+    course === undefined ||
+    (fromApi && preview && authLoading) ||
+    (!fromApi && authLoading)
+
+  if (pageLoading) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
@@ -104,6 +138,9 @@ function CourseSlugInner() {
   const lesson = lessons[activeIdx] ?? lessons[0]
   const invalidLesson = lesson && !isAllowedVideoUrl(lesson.videoUrl)
 
+  const isOwner = Boolean(user && String(course.authorId) === String(user.id))
+  const paywalledPaidPlayback = course.accessType === "PAID" && !isOwner
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -121,6 +158,9 @@ function CourseSlugInner() {
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <Badge variant="secondary" className="text-[10px] gap-1">
                     <GraduationCap size={10} /> Video course
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] border-brand/30 text-brand">
+                    {formatCourseAccessLabel(course.accessType, course.price, course.currency)}
                   </Badge>
                   {!course.published && canPreview && (
                     <Badge className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 gap-1">
@@ -174,20 +214,55 @@ function CourseSlugInner() {
                   <div>
                     <h2 className="font-serif text-lg font-bold text-foreground mb-1">{lesson.title}</h2>
                     <p className="text-xs text-muted-foreground">
-                      Video plays from {invalidLesson ? "linked provider" : "embedded player"} — hosted on YouTube or
-                      Vimeo.
+                      {paywalledPaidPlayback
+                        ? "Video playback unlocks after purchase."
+                        : `Video plays from ${invalidLesson ? "linked provider" : "embedded player"} — hosted on YouTube or Vimeo.`}
                     </p>
                   </div>
-                  <VideoEmbedFrame url={lesson.videoUrl} title={lesson.title} />
-                  {!invalidLesson && (
-                    <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                      <ExternalLink size={10} />
-                      Having trouble? Open the original link in{" "}
-                      <a href={lesson.videoUrl} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
-                        a new tab
-                      </a>
+                  {course.accessType === "SUBSCRIPTION" && !isOwner ? (
+                    <p className="text-xs text-muted-foreground rounded-lg border border-border bg-muted/30 px-3 py-2">
+                      This course is included with eligible reader plans.{" "}
+                      <Link href="/subscription" className="text-brand font-medium hover:underline">
+                        View subscription options
+                      </Link>
                       .
                     </p>
+                  ) : null}
+                  {paywalledPaidPlayback ? (
+                    <div className="rounded-2xl border-2 border-dashed border-brand/35 bg-gradient-to-b from-brand/5 to-muted/20 aspect-video flex flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+                      <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center">
+                        <CreditCard className="h-7 w-7 text-brand" />
+                      </div>
+                      <div>
+                        <p className="font-serif text-lg font-bold text-foreground">Purchase to watch</p>
+                        <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                          {formatCourseAccessLabel(course.accessType, course.price, course.currency)} — individual course
+                          checkout is coming soon. Contact us to arrange access, or explore a reader subscription.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <Button asChild className="bg-brand text-primary-foreground hover:bg-brand-dark">
+                          <Link href="/contact">Contact us</Link>
+                        </Button>
+                        <Button asChild variant="outline" className="border-brand/40 text-brand">
+                          <Link href="/subscription">Subscription plans</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <VideoEmbedFrame url={lesson.videoUrl} title={lesson.title} />
+                      {!invalidLesson && (
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <ExternalLink size={10} />
+                          Having trouble? Open the original link in{" "}
+                          <a href={lesson.videoUrl} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                            a new tab
+                          </a>
+                          .
+                        </p>
+                      )}
+                    </>
                   )}
                 </>
               ) : (

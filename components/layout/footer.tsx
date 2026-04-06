@@ -7,6 +7,7 @@ const FOOTER_LINKS = {
     { label: "Sign In",             href: "/auth/login" },
     { label: "Create Account",      href: "/auth/register?next=%2Fdiscover" },
     { label: "Discover Books",      href: "/discover" },
+    { label: "Video courses",       href: "/courses" },
     { label: "eBooks Store",        href: "/books" },
     { label: "Audiobooks",          href: "/audiobooks" },
     { label: "Subscription Plans",  href: "/subscription" },

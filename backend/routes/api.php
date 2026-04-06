@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\CmsPublicController;
 use App\Http\Controllers\Api\FcmDeviceController;
 use App\Http\Controllers\Api\UserNotificationController;
 use App\Http\Controllers\Api\AuthorApplicationController;
+use App\Http\Controllers\Api\AuthorCourseController;
 use App\Http\Controllers\Api\AuthorSalesController;
 use App\Http\Controllers\Api\AuthorSubscriptionEngagementController;
 use App\Http\Controllers\Api\AuthController;
@@ -32,12 +33,14 @@ use App\Http\Controllers\Api\AuthorPublicController;
 use App\Http\Controllers\Api\BookCategoryController;
 use App\Http\Controllers\Api\BookController;
 use App\Http\Controllers\Api\BookSearchController;
+use App\Http\Controllers\Api\Admin\AdminAuthorCourseController;
 use App\Http\Controllers\Api\Admin\AdminContactSubmissionController;
 use App\Http\Controllers\Api\Admin\AdminSiteFeaturesController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\SiteConfigController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\ContactSubmissionController;
+use App\Http\Controllers\Api\CoursePublicController;
 use App\Http\Controllers\Api\CouponValidateController;
 use App\Http\Controllers\Api\LibraryController;
 use App\Http\Controllers\Api\ReadingEngagementController;
@@ -95,6 +98,10 @@ Route::get('/authors/trending', [TrendingAuthorsController::class, 'index'])->mi
 Route::get('/authors/{author}', [AuthorPublicController::class, 'show'])
     ->whereNumber('author')
     ->middleware('throttle:search');
+
+Route::get('/courses', [CoursePublicController::class, 'index'])->middleware('throttle:search');
+Route::get('/courses/{slug}', [CoursePublicController::class, 'show'])
+    ->middleware(['throttle:search', 'auth.optional']);
 
 Route::post('/coupons/validate', CouponValidateController::class);
 
@@ -182,6 +189,11 @@ Route::middleware(['auth:sanctum', 'not.blocked'])->group(function () {
     Route::get('/author/sales/books', [AuthorSalesController::class, 'books']);
     Route::get('/author/sales/transactions', [AuthorSalesController::class, 'transactions']);
 
+    Route::get('/author/courses', [AuthorCourseController::class, 'index']);
+    Route::post('/author/courses', [AuthorCourseController::class, 'store']);
+    Route::put('/author/courses/{authorCourse}', [AuthorCourseController::class, 'update']);
+    Route::delete('/author/courses/{authorCourse}', [AuthorCourseController::class, 'destroy']);
+
     Route::get('/author/subscription-pool/summary', [AuthorSubscriptionEngagementController::class, 'summary']);
     Route::get('/author/subscription-pool/payouts', [AuthorSubscriptionEngagementController::class, 'payouts']);
     Route::get('/author/subscription-pool/cycles/{revenueCycle}', [AuthorSubscriptionEngagementController::class, 'cycleTransparency']);
@@ -205,6 +217,8 @@ Route::middleware(['auth:sanctum', 'not.blocked'])->group(function () {
         Route::get('/analytics/top-books/engagement', [AdminAnalyticsController::class, 'topBooksByEngagement']);
         Route::get('/analytics/top-authors', [AdminAnalyticsController::class, 'topAuthors']);
         Route::get('/analytics/cohort-retention', [AdminAnalyticsController::class, 'cohortRetention']);
+
+        Route::get('/author-courses', [AdminAuthorCourseController::class, 'index']);
 
         Route::get('/homepage/sections', [AdminHomepageController::class, 'sectionsIndex']);
         Route::post('/homepage/sections', [AdminHomepageController::class, 'storeSection']);

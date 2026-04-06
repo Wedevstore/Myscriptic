@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import {
   Users, BookOpen, DollarSign, TrendingUp, ChevronRight,
   CheckCircle, Clock, XCircle, Bell, Tag, ArrowUpRight,
-  BarChart3, AlertCircle, Zap, Mail,
+  BarChart3, AlertCircle, Zap, Mail, GraduationCap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { adminApi } from "@/lib/api"
@@ -155,6 +155,7 @@ export default function AdminOverviewPage() {
     activeSubscribers: apiMetrics?.subscriptions_active ?? mockStats.activeSubscribers,
     monthlyRevenue: apiMetrics?.revenue_month_usd ?? mockStats.monthlyRevenue,
     totalBooks: apiMetrics?.books_total ?? mockStats.totalBooks,
+    authorCoursesTotal: apiMetrics?.author_courses_total ?? 0,
     totalAuthors: apiMetrics?.authors_total ?? mockStats.totalAuthors,
     lifetimeRevenue: apiMetrics?.revenue_lifetime_usd ?? mockStats.lifetimeRevenue,
     pendingApprovals: apiMetrics?.pending_author_applications ?? mockStats.pendingApprovals,
@@ -210,11 +211,19 @@ export default function AdminOverviewPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <KpiCard label="Total Users"       value={stats.totalUsers.toLocaleString()}        delta="+8.4% this month"  isLive={Boolean(live && apiMetrics)} icon={Users}      cls="bg-blue-50 dark:bg-blue-900/20 text-blue-500"   href="/dashboard/admin/users" />
         <KpiCard label="Active Subscribers" value={stats.activeSubscribers.toLocaleString()} delta="+6.1% this month"  isLive={Boolean(live && apiMetrics)} icon={TrendingUp} cls="bg-purple-50 dark:bg-purple-900/20 text-purple-500" href="/dashboard/admin/subscriptions" />
         <KpiCard label="Monthly Revenue"   value={`$${stats.monthlyRevenue.toLocaleString()}`} delta="+18.2% vs last month" isLive={Boolean(live && apiMetrics)} icon={DollarSign} cls="bg-green-50 dark:bg-green-900/20 text-green-500"  href="/dashboard/admin/revenue" />
         <KpiCard label="Total Books"       value={stats.totalBooks.toLocaleString()}         delta="+12% this month"   isLive={Boolean(live && apiMetrics)} icon={BookOpen}   cls="bg-amber-50 dark:bg-amber-900/20 text-brand"     href="/dashboard/admin/books" />
+        <KpiCard
+          label="Author courses"
+          value={stats.authorCoursesTotal.toLocaleString()}
+          isLive={Boolean(live && apiMetrics)}
+          icon={GraduationCap}
+          cls="bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400"
+          href="/dashboard/admin/author-courses"
+        />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
@@ -251,6 +260,7 @@ export default function AdminOverviewPage() {
           <QuickLink href="/dashboard/admin/contact-messages" icon={Mail}     label="Contact inbox"    color="bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400" />
           <QuickLink href="/dashboard/admin/authors"      icon={Users}        label="Author Approvals" count={stats.pendingApprovals} color="bg-purple-50 dark:bg-purple-900/20 text-purple-500" />
           <QuickLink href="/dashboard/admin/cms"          icon={BarChart3}    label="CMS Builder"      color="bg-green-50 dark:bg-green-900/20 text-green-500" />
+          <QuickLink href="/dashboard/admin/author-courses" icon={GraduationCap} label="Author courses" color="bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400" />
           <QuickLink href="/dashboard/admin/coupons"      icon={Tag}          label="Coupons"          color="bg-orange-50 dark:bg-orange-900/20 text-orange-500" />
           <QuickLink href="/dashboard/admin/revenue"      icon={DollarSign}   label="Revenue Pool"     color="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500" />
         </div>

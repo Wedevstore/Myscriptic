@@ -6,38 +6,116 @@ import { Navbar } from "@/components/layout/navbar"
 import { Footer } from "@/components/layout/footer"
 import { Providers } from "@/components/providers"
 import { Button } from "@/components/ui/button"
-import { GraduationCap, PlayCircle, ArrowRight, User } from "lucide-react"
-import { seedAuthorCourses, authorCourseStore, type AuthorCourse } from "@/lib/author-courses-store"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { GraduationCap, PlayCircle, ArrowRight, User, Search } from "lucide-react"
+import {
+  seedAuthorCourses,
+  authorCourseStore,
+  courseLessonCount,
+  type AuthorCourse,
+} from "@/lib/author-courses-store"
+import { laravelCoursesEnabled } from "@/lib/auth-mode"
+import { coursesPublicApi } from "@/lib/api"
+import { mapAuthorCourseCardFromApi } from "@/lib/courses-from-api"
 import { CoverImage } from "@/components/ui/cover-image"
+import { Badge } from "@/components/ui/badge"
+import { formatCourseAccessLabel } from "@/lib/course-access"
 
 function CoursesGrid() {
   const [courses, setCourses] = React.useState<AuthorCourse[]>([])
+  const [query, setQuery] = React.useState("")
+  const [debouncedQ, setDebouncedQ] = React.useState("")
 
   React.useEffect(() => {
-    seedAuthorCourses()
-    const refresh = () => setCourses(authorCourseStore.getPublished())
+    const t = window.setTimeout(() => setDebouncedQ(query.trim()), 300)
+    return () => window.clearTimeout(t)
+  }, [query])
+
+  React.useEffect(() => {
+    const refresh = () => {
+      if (laravelCoursesEnabled()) {
+        void coursesPublicApi
+          .list(debouncedQ ? { q: debouncedQ } : undefined)
+          .then(res => setCourses(res.data.map(mapAuthorCourseCardFromApi)))
+          .catch(() => setCourses([]))
+        return
+      }
+      seedAuthorCourses()
+      let list = authorCourseStore.getPublished()
+      if (debouncedQ) {
+        const q = debouncedQ.toLowerCase()
+        list = list.filter(
+          c =>
+            c.title.toLowerCase().includes(q) ||
+            c.slug.toLowerCase().includes(q) ||
+            c.description.toLowerCase().includes(q) ||
+            c.authorName.toLowerCase().includes(q)
+        )
+      }
+      setCourses(list)
+    }
     refresh()
     window.addEventListener("author-courses-changed", refresh)
     return () => window.removeEventListener("author-courses-changed", refresh)
-  }, [])
+  }, [debouncedQ])
+
+  const searchBar = (
+    <div className="max-w-md">
+      <Label htmlFor="courses-search" className="text-xs text-muted-foreground mb-1.5 block">
+        Search courses
+      </Label>
+      <div className="relative">
+        <Search
+          className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"
+          aria-hidden
+        />
+        <Input
+          id="courses-search"
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Title, author, or topic…"
+          className="pl-9"
+          autoComplete="off"
+        />
+      </div>
+    </div>
+  )
 
   if (courses.length === 0) {
+    const filtered = debouncedQ.length > 0
     return (
-      <div className="max-w-lg mx-auto text-center py-20 px-4">
-        <GraduationCap className="h-14 w-14 text-muted-foreground/40 mx-auto mb-4" />
-        <h2 className="font-serif text-xl font-bold text-foreground mb-2">No published courses yet</h2>
-        <p className="text-sm text-muted-foreground mb-6">
-          Authors can publish video courses with YouTube or Vimeo links from the author dashboard.
-        </p>
-        <Button asChild variant="outline" className="border-brand/40 text-brand">
-          <Link href="/become-author">Become an author</Link>
-        </Button>
+      <div className="space-y-8">
+        {searchBar}
+        <div className="max-w-lg mx-auto text-center py-16 px-4">
+          <GraduationCap className="h-14 w-14 text-muted-foreground/40 mx-auto mb-4" />
+          <h2 className="font-serif text-xl font-bold text-foreground mb-2">
+            {filtered ? "No matching courses" : "No published courses yet"}
+          </h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            {filtered
+              ? "Try a different search term or clear the box to see all published courses."
+              : "Authors can publish video courses with YouTube or Vimeo links from the author dashboard."}
+          </p>
+          {filtered ? (
+            <Button type="button" variant="outline" className="border-brand/40 text-brand" onClick={() => setQuery("")}>
+              Clear search
+            </Button>
+          ) : (
+            <Button asChild variant="outline" className="border-brand/40 text-brand">
+              <Link href="/become-author">Become an author</Link>
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div className="space-y-8">
+      {searchBar}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
       {courses.map(course => (
         <Link
           key={course.id}
@@ -58,9 +136,14 @@ function CoursesGrid() {
               </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+            <div className="absolute top-3 right-3">
+              <Badge className="text-[10px] bg-black/55 text-white border-white/15 backdrop-blur-sm hover:bg-black/55">
+                {formatCourseAccessLabel(course.accessType, course.price, course.currency)}
+              </Badge>
+            </div>
             <div className="absolute bottom-3 left-3 text-xs font-medium text-white flex items-center gap-1.5">
               <PlayCircle size={14} />
-              {course.lessons.length} lesson{course.lessons.length === 1 ? "" : "s"}
+              {courseLessonCount(course)} lesson{courseLessonCount(course) === 1 ? "" : "s"}
             </div>
           </div>
           <div className="p-6 flex-1 flex flex-col">
@@ -79,6 +162,7 @@ function CoursesGrid() {
           </div>
         </Link>
       ))}
+      </div>
     </div>
   )
 }

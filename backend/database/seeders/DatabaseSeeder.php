@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\AuthorCourse;
 use App\Models\Book;
 use App\Models\Coupon;
 use App\Models\PlatformSetting;
@@ -551,6 +552,27 @@ TEXT;
                 'currency' => 'USD',
             ]);
         }
+
+        $seedCourse = AuthorCourse::query()->create([
+            'user_id' => $author->id,
+            'title' => 'Fiction Workshop: From Idea to Outline',
+            'slug' => 'fiction-workshop-outline',
+            'description' => 'Short lessons on hooks, character wants, and three-act structure. Videos are hosted on YouTube and Vimeo.',
+            'thumbnail_url' => 'https://placehold.co/640x360/1a1a2e/FFB547?text=Author+Course',
+            'published' => true,
+        ]);
+        $seedCourse->lessons()->createMany([
+            [
+                'title' => 'Opening hooks that grab readers',
+                'video_url' => 'https://www.youtube.com/watch?v=34Na4j8AVgA',
+                'sort_order' => 0,
+            ],
+            [
+                'title' => 'Pacing your middle act',
+                'video_url' => 'https://vimeo.com/148751763',
+                'sort_order' => 1,
+            ],
+        ]);
 
         Coupon::query()->create([
             'code' => 'READ20',

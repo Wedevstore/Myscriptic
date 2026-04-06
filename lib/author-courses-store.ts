@@ -3,6 +3,7 @@
  */
 
 import { slugify } from "@/lib/slugify"
+import type { CourseAccessType } from "@/lib/course-access"
 
 function ls<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback
@@ -59,9 +60,31 @@ export interface AuthorCourse {
   description: string
   thumbnailUrl: string | null
   published: boolean
+  accessType: CourseAccessType
+  /** Set when accessType is PAID (marketplace parity with books). */
+  price: number | null
+  currency: string
   lessons: AuthorCourseLesson[]
+  /** Set when loaded from GET /courses list (no embedded lessons). */
+  lessonCount?: number
   createdAt: string
   updatedAt: string
+}
+
+export function courseLessonCount(c: AuthorCourse): number {
+  return c.lessonCount ?? c.lessons.length
+}
+
+function normalizeCourse(raw: AuthorCourse): AuthorCourse {
+  const a = raw.accessType
+  const accessType: CourseAccessType =
+    a === "FREE" || a === "PAID" || a === "SUBSCRIPTION" ? a : "SUBSCRIPTION"
+  return {
+    ...raw,
+    accessType,
+    price: raw.price ?? null,
+    currency: raw.currency ?? "USD",
+  }
 }
 
 function uniqueSlug(base: string, excludeId?: string): string {
@@ -75,7 +98,7 @@ function uniqueSlug(base: string, excludeId?: string): string {
 
 export const authorCourseStore = {
   getAll(): AuthorCourse[] {
-    return ls<AuthorCourse[]>(KEY, [])
+    return ls<AuthorCourse[]>(KEY, []).map(normalizeCourse)
   },
 
   getPublished(): AuthorCourse[] {
@@ -105,6 +128,9 @@ export const authorCourseStore = {
     description: string
     thumbnailUrl: string | null
     published: boolean
+    accessType?: CourseAccessType
+    price?: number | null
+    currency?: string
     lessons: Omit<AuthorCourseLesson, "id" | "sortOrder">[]
     /** If set, used as the base for the URL slug (deduped). */
     slugBase?: string | null
@@ -115,6 +141,8 @@ export const authorCourseStore = {
       id: lessonUid(),
       sortOrder: i,
     }))
+    const accessType = data.accessType ?? "SUBSCRIPTION"
+    const price = accessType === "PAID" && data.price != null ? data.price : null
     const rec: AuthorCourse = {
       id: uid(),
       authorId: data.authorId,
@@ -124,6 +152,9 @@ export const authorCourseStore = {
       description: data.description.trim(),
       thumbnailUrl: data.thumbnailUrl?.trim() || null,
       published: data.published,
+      accessType,
+      price,
+      currency: data.currency ?? "USD",
       lessons,
       createdAt: now(),
       updatedAt: now(),
@@ -186,6 +217,9 @@ export function seedAuthorCourses() {
       "Short lessons on hooks, character wants, and three-act structure. Videos hosted on YouTube and Vimeo — watch here on MyScriptic.",
     thumbnailUrl: "https://placehold.co/640x360/1a1a2e/FFB547?text=Author+Course",
     published: true,
+    accessType: "SUBSCRIPTION",
+    price: null,
+    currency: "USD",
     lessons: [
       {
         title: "Opening hooks that grab readers",

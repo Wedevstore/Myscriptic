@@ -4,8 +4,17 @@ import * as React from "react"
 import Link from "next/link"
 import { GraduationCap, PlayCircle, ArrowRight, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { seedAuthorCourses, authorCourseStore, type AuthorCourse } from "@/lib/author-courses-store"
+import {
+  seedAuthorCourses,
+  authorCourseStore,
+  courseLessonCount,
+  type AuthorCourse,
+} from "@/lib/author-courses-store"
+import { laravelCoursesEnabled } from "@/lib/auth-mode"
+import { coursesPublicApi } from "@/lib/api"
+import { mapAuthorCourseCardFromApi } from "@/lib/courses-from-api"
 import { CoverImage } from "@/components/ui/cover-image"
+import { formatCourseAccessLabel } from "@/lib/course-access"
 
 export function CourseStrip({
   title = "Learn from authors",
@@ -17,8 +26,17 @@ export function CourseStrip({
   const [courses, setCourses] = React.useState<AuthorCourse[]>([])
 
   React.useEffect(() => {
-    seedAuthorCourses()
-    const refresh = () => setCourses(authorCourseStore.getPublished().slice(0, 6))
+    const refresh = () => {
+      if (laravelCoursesEnabled()) {
+        void coursesPublicApi
+          .list()
+          .then(res => setCourses(res.data.slice(0, 6).map(mapAuthorCourseCardFromApi)))
+          .catch(() => setCourses([]))
+        return
+      }
+      seedAuthorCourses()
+      setCourses(authorCourseStore.getPublished().slice(0, 6))
+    }
     refresh()
     window.addEventListener("author-courses-changed", refresh)
     window.addEventListener("storage", refresh)
@@ -71,10 +89,13 @@ export function CourseStrip({
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
+                <div className="absolute top-2 right-2 rounded-md bg-black/55 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-white border border-white/10">
+                  {formatCourseAccessLabel(course.accessType, course.price, course.currency)}
+                </div>
                 <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
                   <span className="text-[11px] font-medium text-white/90 flex items-center gap-1.5 min-w-0">
                     <PlayCircle size={14} className="shrink-0" />
-                    {course.lessons.length} lesson{course.lessons.length === 1 ? "" : "s"}
+                    {courseLessonCount(course)} lesson{courseLessonCount(course) === 1 ? "" : "s"}
                   </span>
                 </div>
               </div>

@@ -23,7 +23,8 @@ class AuthorPublicApiTest extends TestCase
             ->assertJsonPath('data.id', (string) $author->id)
             ->assertJsonPath('data.name', 'Public Author')
             ->assertJsonPath('data.avatar', 'https://example.test/a.png')
-            ->assertJsonStructure(['data' => ['id', 'name', 'avatar', 'books', 'followers']]);
+            ->assertJsonStructure(['data' => ['id', 'name', 'avatar', 'books', 'followers', 'courses']])
+            ->assertJsonPath('data.courses', []);
     }
 
     public function test_public_author_profile_404_for_non_author(): void

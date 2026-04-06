@@ -90,6 +90,11 @@ class User extends Authenticatable
         return $this->hasMany(WishlistItem::class);
     }
 
+    public function authorCourses(): HasMany
+    {
+        return $this->hasMany(AuthorCourse::class, 'user_id');
+    }
+
     public function activeSubscription(): ?Subscription
     {
         return $this->subscriptions()

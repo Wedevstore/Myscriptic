@@ -22,9 +22,12 @@ import {
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
 import {
   Users, BookOpen, Star, CheckCircle2, ArrowLeft, Twitter,
-  Globe, MessageSquare, Award, TrendingUp,
+  Globe, MessageSquare, Award, TrendingUp, GraduationCap, PlayCircle, ArrowRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
+import type { CourseAccessType } from "@/lib/course-access"
+import { formatCourseAccessLabel } from "@/lib/course-access"
 
 // ── Extended author data ──────────────────────────────────────────────────────
 const AUTHOR_PROFILES: Record<string, {
@@ -122,6 +125,15 @@ function LiveAuthorProfile({ authorId }: { authorId: string }) {
     avatar: string
     books: number
     followers: number
+    courses?: {
+      slug: string
+      title: string
+      lesson_count: number
+      thumbnail_url: string | null
+      access_type?: string
+      price?: number | null
+      currency?: string | null
+    }[]
   } | null>(null)
   const [books, setBooks] = React.useState<BookCardData[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -304,6 +316,64 @@ function LiveAuthorProfile({ authorId }: { authorId: string }) {
           </div>
         )}
       </div>
+
+      {profile.courses && profile.courses.length > 0 ? (
+        <div className="mt-12">
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5">
+                <GraduationCap size={12} className="text-brand" />
+                Courses
+              </p>
+              <h2 className="font-serif text-2xl font-bold text-foreground">Video courses</h2>
+            </div>
+            <Link href="/courses" className="text-sm text-brand font-semibold hover:underline flex items-center gap-1">
+              All courses <ArrowRight size={13} />
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {profile.courses.map(c => (
+              <Link
+                key={c.slug}
+                href={`/courses/${c.slug}`}
+                className="group flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:border-brand/35 transition-all"
+              >
+                <div className="relative aspect-video bg-muted">
+                  {c.thumbnail_url ? (
+                    <CoverImage
+                      src={c.thumbnail_url}
+                      alt=""
+                      className="group-hover:scale-[1.02] transition-transform duration-500"
+                      sizes="(max-width: 1024px) 90vw, 360px"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-brand/15 to-brand/5">
+                      <PlayCircle className="h-12 w-12 text-brand/70" strokeWidth={1.2} />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2 rounded-md bg-black/55 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-white border border-white/10">
+                    {(() => {
+                      const raw = c.access_type
+                      const access: CourseAccessType =
+                        raw === "FREE" || raw === "PAID" || raw === "SUBSCRIPTION" ? raw : "SUBSCRIPTION"
+                      return formatCourseAccessLabel(access, c.price, c.currency ?? undefined)
+                    })()}
+                  </div>
+                  <div className="absolute bottom-2 left-2 text-[11px] font-medium text-white flex items-center gap-1 drop-shadow-md">
+                    <PlayCircle size={12} />
+                    {c.lesson_count} lesson{c.lesson_count === 1 ? "" : "s"}
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-serif font-semibold text-foreground group-hover:text-brand transition-colors line-clamp-2">
+                    {c.title}
+                  </h3>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <Separator className="my-12" />
       <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-brand/20 bg-brand/5 p-7">

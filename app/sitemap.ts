@@ -7,6 +7,10 @@ type BooksPage = {
   meta?: { last_page?: number }
 }
 
+type CoursesList = {
+  data: { slug: string }[]
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl()
   const staticPaths = [
@@ -16,6 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/subscription",
     "/discover",
     "/audiobooks",
+    "/courses",
   ]
 
   const entries: MetadataRoute.Sitemap = staticPaths.map(path => ({
@@ -50,6 +55,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly",
         priority: 0.8,
       })
+    }
+  }
+
+  const coursesJson = await serverFetchJson<CoursesList>("/courses", 3600)
+  if (coursesJson?.data?.length) {
+    for (const c of coursesJson.data) {
+      if (c.slug) {
+        entries.push({
+          url: `${base}/courses/${encodeURIComponent(c.slug)}`,
+          changeFrequency: "weekly",
+          priority: 0.72,
+        })
+      }
     }
   }
 

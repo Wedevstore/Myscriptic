@@ -8,7 +8,11 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { Navbar } from "@/components/layout/navbar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { seedAuthorCourses, authorCourseStore, type AuthorCourse } from "@/lib/author-courses-store"
+import { seedAuthorCourses, authorCourseStore, courseLessonCount, type AuthorCourse } from "@/lib/author-courses-store"
+import { laravelCoursesEnabled } from "@/lib/auth-mode"
+import { authorCoursesApi } from "@/lib/api"
+import { mapAuthorCourseDetailFromApi } from "@/lib/courses-from-api"
+import { formatCourseAccessLabel } from "@/lib/course-access"
 import {
   ChevronLeft, Plus, Pencil, Trash2, Eye, Copy, Check, GraduationCap, ExternalLink,
 } from "lucide-react"
@@ -29,6 +33,13 @@ function AuthorCoursesListContent() {
 
   const refresh = React.useCallback(() => {
     if (!user?.id) return
+    if (laravelCoursesEnabled()) {
+      void authorCoursesApi
+        .list()
+        .then(res => setRows(res.data.map(mapAuthorCourseDetailFromApi)))
+        .catch(() => setRows([]))
+      return
+    }
     seedAuthorCourses()
     setRows(authorCourseStore.getByAuthor(user.id))
   }, [user?.id])
@@ -48,6 +59,13 @@ function AuthorCoursesListContent() {
 
   const onDelete = (id: string) => {
     if (!confirm("Delete this course and all its lessons?")) return
+    if (laravelCoursesEnabled()) {
+      void authorCoursesApi.delete(id).then(() => {
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("author-courses-changed"))
+        refresh()
+      })
+      return
+    }
     authorCourseStore.delete(id)
     refresh()
   }
@@ -114,9 +132,12 @@ function AuthorCoursesListContent() {
                         Draft
                       </Badge>
                     )}
+                    <Badge variant="outline" className="text-[10px] border-border text-muted-foreground">
+                      {formatCourseAccessLabel(c.accessType, c.price, c.currency)}
+                    </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground font-mono truncate">
-                    /courses/{c.slug} · {c.lessons.length} lesson{c.lessons.length === 1 ? "" : "s"}
+                    /courses/{c.slug} · {courseLessonCount(c)} lesson{courseLessonCount(c) === 1 ? "" : "s"}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">

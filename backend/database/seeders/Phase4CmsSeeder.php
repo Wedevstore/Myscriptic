@@ -169,6 +169,16 @@ class Phase4CmsSeeder extends Seeder
             ]);
         }
 
+        HomepageSection::query()->create([
+            'title' => 'Learn from authors',
+            'section_type' => 'author_courses',
+            'sort_order' => 9,
+            'is_active' => true,
+            'settings' => [
+                'subtitle' => 'Video courses — lessons stream from YouTube or Vimeo.',
+            ],
+        ]);
+
         $about = '<p>MyScriptic connects readers with African and global stories across ebooks and audiobooks.</p>'.
             '<p><strong>Demo content</strong> — replace this copy and add images from the admin CMS when you go live.</p>';
         foreach ([

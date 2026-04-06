@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuthorApplication;
+use App\Models\AuthorCourse;
 use App\Models\Book;
 use App\Models\Order;
 use App\Models\Subscription;
@@ -41,6 +42,7 @@ class AdminDashboardController extends Controller
             'revenue_month_usd' => round($orderRevenueMonth + $subRevenueMonth, 2),
             'revenue_lifetime_usd' => round($orderRevenueLife + $subRevenueLife, 2),
             'books_total' => Book::query()->count(),
+            'author_courses_total' => AuthorCourse::query()->count(),
             'authors_total' => User::query()->where('role', 'author')->count(),
             'pending_author_applications' => AuthorApplication::query()->where('status', 'pending')->count(),
             'pending_book_approvals' => Book::query()->where('approval_status', 'pending')->count(),

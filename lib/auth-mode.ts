@@ -38,3 +38,13 @@ export function laravelPhase3Enabled(): boolean {
   if (envTruthy(process.env.NEXT_PUBLIC_USE_LARAVEL_PHASE3)) return true
   return laravelAuthEnabled()
 }
+
+/**
+ * When true, public /courses, author dashboard course CRUD, and homepage strip read/write Laravel APIs.
+ * Defaults on with Laravel auth; override with `NEXT_PUBLIC_USE_LARAVEL_COURSES=false`.
+ */
+export function laravelCoursesEnabled(): boolean {
+  if (envFalsey(process.env.NEXT_PUBLIC_USE_LARAVEL_COURSES)) return false
+  if (envTruthy(process.env.NEXT_PUBLIC_USE_LARAVEL_COURSES)) return true
+  return laravelAuthEnabled()
+}
