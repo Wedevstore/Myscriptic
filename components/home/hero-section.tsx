@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, Star, Users, BookOpen, Headphones, TrendingUp } from "lucide-react"
 import { HERO_BANNERS } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 
 const STATS = [
   { icon: BookOpen,   label: "Books",      value: "50K+" },
@@ -142,10 +143,11 @@ export function HeroSection() {
           <div className="relative hidden md:block">
             {/* Main cover */}
             <div className="relative rounded-2xl overflow-hidden shadow-[0_32px_80px_-12px_oklch(0_0_0/0.55)] border border-sidebar-border/30 aspect-[4/3]">
-              <img
+              <CoverImage
                 src={banner.image}
                 alt="Featured reading content"
-                className="w-full h-full object-cover"
+                priority
+                sizes="(min-width: 768px) 42vw, 100vw"
               />
               {/* Dark gradient overlay for text contrast */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
@@ -172,11 +174,14 @@ export function HeroSection() {
 
             {/* Floating book tile — top right */}
             <div className="absolute -top-5 -right-5 glass rounded-xl p-2.5 shadow-xl rotate-3 hover:rotate-0 transition-transform duration-500">
-              <img
-                src="https://placehold.co/56x80?text=Cover"
-                alt="Trending ebook cover editorial dark style"
-                className="w-14 h-20 rounded-lg object-cover"
-              />
+              <div className="relative w-14 h-20 rounded-lg overflow-hidden">
+                <CoverImage
+                  src="https://placehold.co/56x80?text=Cover"
+                  alt="Trending ebook cover editorial dark style"
+                  sizes="56px"
+                  className="rounded-lg"
+                />
+              </div>
             </div>
 
             {/* Floating stats badge — left */}

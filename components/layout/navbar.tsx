@@ -25,6 +25,7 @@ import {
   Crown, BarChart2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import { CART_CHANGED } from "@/lib/cart-events"
 import { fetchCartItemCount } from "@/lib/cart-actions"
 import { MOCK_BOOKS } from "@/lib/mock-data"
@@ -317,11 +318,13 @@ function SearchPalette({ onClose }: { onClose: () => void }) {
                       activeIdx === i && "bg-muted/60"
                     )}
                   >
-                    <img
-                      src={book.coverUrl}
-                      alt={`Cover of ${book.title}`}
-                      className="w-10 h-14 object-cover rounded-lg shadow-sm shrink-0"
-                    />
+                    <div className="relative w-10 h-14 shrink-0 rounded-lg overflow-hidden shadow-sm">
+                      <CoverImage
+                        src={book.coverUrl}
+                        alt={`Cover of ${book.title}`}
+                        sizes="40px"
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{book.title}</p>
                       <p className="text-xs text-muted-foreground">{book.author}</p>

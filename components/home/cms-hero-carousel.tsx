@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import type { CmsHomepageItem } from "@/lib/cms-homepage"
 import { resolveCmsLink } from "@/lib/cms-homepage"
 
@@ -107,7 +108,7 @@ export function CmsHeroCarousel({ items }: Props) {
           <div className="relative hidden md:block">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-sidebar-border/30 aspect-[4/3]">
               {b.image_url ? (
-                <img src={b.image_url} alt="" className="w-full h-full object-cover" />
+                <CoverImage src={b.image_url} alt="" sizes="(min-width: 1024px) 40vw, 100vw" />
               ) : (
                 <div className="w-full h-full bg-muted" />
               )}

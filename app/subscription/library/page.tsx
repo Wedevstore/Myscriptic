@@ -32,6 +32,7 @@ import {
   Lock, SlidersHorizontal, X, Infinity,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 
 // ── Subscription books are FREE + SUBSCRIPTION access type ───────────────────
 type LibraryBookCardModel = {
@@ -198,10 +199,10 @@ function LibraryBookCard({
     <div className="bg-card border border-border rounded-2xl overflow-hidden hover:border-brand/30 hover:shadow-md transition-all group flex flex-col">
       {/* Cover */}
       <div className="relative aspect-[2/3] overflow-hidden bg-muted">
-        <img
+        <CoverImage
           src={book.coverUrl}
           alt={`Cover of ${book.title} by ${book.author}`}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="group-hover:scale-105 transition-transform duration-500"
         />
         {/* Access badge */}
         <div className="absolute top-2 left-2">

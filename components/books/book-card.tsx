@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Star, Headphones, BookOpen, Heart, ShoppingCart, Play, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import { apiUrlConfigured, laravelAuthEnabled, laravelPhase2Enabled } from "@/lib/auth-mode"
 import { wishlistApi } from "@/lib/api"
 import { addBookToCart } from "@/lib/cart-actions"
@@ -89,10 +90,11 @@ function HorizontalCard({ book }: { book: BookCardData }) {
     <div className="flex gap-4 p-3.5 rounded-xl border border-border bg-card hover:border-brand/30 hover:shadow-md transition-all duration-200 group card-lift">
       <Link href={`/books/${book.id}`} className="shrink-0">
         <div className="w-16 h-24 rounded-lg overflow-hidden shadow-sm relative">
-          <img
+          <CoverImage
             src={book.coverUrl}
             alt={`Book cover of ${book.title}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            sizes="64px"
+            className="group-hover:scale-105 transition-transform duration-300"
           />
         </div>
       </Link>
@@ -135,10 +137,10 @@ function CompactCard({ book }: { book: BookCardData }) {
   return (
     <Link href={`/books/${book.id}`} className="block group">
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted shadow-sm ring-1 ring-border/50">
-        <img
+        <CoverImage
           src={book.coverUrl}
           alt={`Cover of ${book.title}`}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
+          className="group-hover:scale-105 transition-transform duration-350"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="absolute bottom-2 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -233,11 +235,11 @@ function DefaultCard({ book, className }: { book: BookCardData; className?: stri
     <div className={cn("book-card flex flex-col rounded-2xl border border-border bg-card overflow-hidden", className)}>
       {/* Cover */}
       <div className="relative aspect-[2/3] bg-muted overflow-hidden">
-        <Link href={`/books/${book.id}`} className="absolute inset-0" tabIndex={-1} aria-hidden>
-          <img
+        <Link href={`/books/${book.id}`} className="absolute inset-0 block" tabIndex={-1} aria-hidden>
+          <CoverImage
             src={book.coverUrl}
             alt={`Book cover of ${book.title} by ${book.author}`}
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+            className="hover:scale-105 transition-transform duration-500"
           />
           {/* Cover sheen */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />

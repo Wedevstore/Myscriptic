@@ -14,6 +14,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { Users, BookOpen, CheckCircle2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 
 type AuthorRow = {
   id: string
@@ -115,12 +116,15 @@ export function TrendingAuthors() {
 
                 {/* Avatar */}
                 <div className="relative mt-1">
-                  <div className="w-18 h-18 rounded-full p-0.5 bg-gradient-to-br from-brand to-brand-dark shadow-md">
-                    <img
-                      src={author.avatar}
-                      alt={`${author.name} author photo`}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-background"
-                    />
+                  <div className="w-18 h-18 rounded-full p-0.5 bg-gradient-to-br from-brand to-brand-dark shadow-md flex items-center justify-center">
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-background shrink-0">
+                      <CoverImage
+                        src={author.avatar}
+                        alt={`${author.name} author photo`}
+                        sizes="64px"
+                        className="rounded-full"
+                      />
+                    </div>
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-brand rounded-full flex items-center justify-center border-2 border-background shadow-sm">
                     <CheckCircle2 size={12} className="text-primary-foreground" />
