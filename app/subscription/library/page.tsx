@@ -82,6 +82,8 @@ function mapSubscriptionCatalogRow(r: Record<string, unknown>): LibraryBookCardM
   }
 }
 
+const EMPTY_LIBRARY_POOL: LibraryBookCardModel[] = []
+
 const SORT_OPTIONS = [
   { id: "trending",  label: "Trending"     },
   { id: "newest",    label: "Newest First" },
@@ -452,9 +454,11 @@ function SubscriptionLibraryContent() {
     }
   }, [sub, user, category, format, sort])
 
-  const pool: LibraryBookCardModel[] | null = useRemoteCatalog
-    ? (catalogLoading && liveBooks === null ? null : (liveBooks ?? []))
-    : MOCK_LIBRARY_BOOKS
+  const pool = React.useMemo((): LibraryBookCardModel[] | null => {
+    if (!useRemoteCatalog) return MOCK_LIBRARY_BOOKS
+    if (catalogLoading && liveBooks === null) return null
+    return liveBooks ?? EMPTY_LIBRARY_POOL
+  }, [useRemoteCatalog, catalogLoading, liveBooks])
 
   const filtered = React.useMemo(() => {
     if (pool === null) return []

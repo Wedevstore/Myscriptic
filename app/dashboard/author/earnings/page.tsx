@@ -340,7 +340,7 @@ function BookEngagementTable({
       const engMin = records.reduce((s, r) => s + Math.floor(r.readingTimeSec / 60), 0)
       return { book, readers, avgComp, engMin }
     })
-  }, [authorId, cycleId])
+  }, [cycleId])
 
   const rows =
     liveRows != null
