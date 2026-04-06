@@ -18,7 +18,7 @@ Copy from `backend/.env.example` and set at minimum:
 |------|-----------|
 | Core | `APP_KEY`, `APP_URL`, `APP_ENV=production`, `APP_DEBUG=false` |
 | DB | `DB_*` (use managed MySQL/Postgres in production) |
-| CORS | `CORS_ALLOWED_ORIGINS` — comma-separated origins (no spaces); include **apex, `www`, production Vercel host, and `http://localhost:3000`** as needed. Each is a distinct origin. |
+| CORS | `CORS_ALLOWED_ORIGINS` — comma-separated origins (no spaces); include **apex, `www`, production Vercel host, and `http://localhost:3000`** as needed. Do **not** use `*` — `config/cors.php` strips it so responses echo the real `Origin` instead of `Access-Control-Allow-Origin: *`. |
 | CORS previews | `CORS_USE_VERCEL_PREVIEW_ORIGINS=true` (default) allows `https://*.vercel.app` via `config/cors.php` patterns; set `false` to rely only on `CORS_ALLOWED_ORIGINS`. |
 | Frontend | `FRONTEND_URL` — must match the live site (**`https://www.myscriptic.com`** when that is canonical) and **Vercel `NEXT_PUBLIC_SITE_URL`**; use **`https://myscriptic.vercel.app`** for preview-only checkout. Mismatch causes wrong redirects after payment. |
 | Cache | `CACHE_STORE=redis`, `REDIS_*` |

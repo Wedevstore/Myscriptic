@@ -1,5 +1,14 @@
 <?php
 
+/*
+| Build explicit origin list. A literal `*` entry is stripped: fruitcake/php-cors treats `*` as
+| allow-all and sends Access-Control-Allow-Origin: *, which we avoid in production.
+*/
+$__cors_origins = array_values(array_filter(
+    array_map('trim', explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:3000'))),
+    static fn (string $o): bool => $o !== '' && $o !== '*'
+));
+
 return [
 
     /*
@@ -19,10 +28,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => array_values(array_filter(array_map(
-        'trim',
-        explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:3000'))
-    ))),
+    'allowed_origins' => $__cors_origins,
 
     /*
     | When true (default), preview deployments whose Origin matches https://*.vercel.app

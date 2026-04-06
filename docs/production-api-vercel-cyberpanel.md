@@ -67,7 +67,9 @@ php artisan config:clear
 php artisan config:cache
 ```
 
-**Check:** preflight with `Origin: https://myscriptic.vercel.app` should echo that origin, e.g. **`Access-Control-Allow-Origin: https://myscriptic.vercel.app`**.
+**Check:** preflight with `Origin: https://www.myscriptic.com` (or your preview URL) should echo **that same origin** in **`Access-Control-Allow-Origin`** — not `*`. The app config strips a lone `*` from `CORS_ALLOWED_ORIGINS` so php-cors never uses allow-all mode; remove `CORS_ALLOWED_ORIGINS=*` from server `.env` if it was set, then `config:cache` again.
+
+**Proxy:** If OpenLiteSpeed/Nginx adds its own `Access-Control-Allow-Origin`, remove or align it so only Laravel sets CORS (duplicate or `*` headers confuse browsers).
 
 ### Frontend URL (emails, redirects, Phase 2 helpers)
 
