@@ -29,8 +29,10 @@ import {
 } from "@/lib/store"
 import {
   ChevronLeft, ChevronRight, BookOpen, Sun, Moon,
-  Minus, Plus, List, X, Settings, Type, Clock,
+  Minus, Plus,   List, X, Settings, Type, Clock,
   Lock, ShoppingCart, Crown, CheckCircle,
+  Library, PanelTopOpen, Bookmark,
+  Palette, Sparkles, Rows3, ScrollText, GalleryHorizontal, Play, Pause, HelpCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ProtectedSurface } from "@/components/protected-surface"
@@ -127,12 +129,141 @@ const TOTAL_PAGES = 342 // the "real" book length (engagement is computed agains
 
 type Theme    = "light" | "dark" | "sepia"
 type FontSize = 14 | 16 | 18 | 20 | 22
+type FontFamily = "serif" | "sans"
+type LineHeightPreset = "compact" | "comfortable" | "spacious"
+/** Vertical = continuous scroll; horizontal = paginated swipe carousel. */
+type ReadingLayout = "vertical" | "horizontal"
+
+const READING_LAYOUT_KEY = "myscriptic-reader-layout"
+const AUTO_SCROLL_ON_KEY = "myscriptic-reader-autoscroll-on"
+const AUTO_SCROLL_SPEED_KEY = "myscriptic-reader-autoscroll-speed"
+/** Pixels per second at slider midpoint; range tuned for comfortable reading. */
+const AUTO_SCROLL_SPEED_MIN = 12
+const AUTO_SCROLL_SPEED_MAX = 96
+const AUTO_SCROLL_SPEED_DEFAULT = 38
+
+const READER_PREF_THEME_KEY = "myscriptic-reader-pref-theme"
+const READER_PREF_FONT_SIZE_KEY = "myscriptic-reader-pref-font-size"
+const READER_PREF_FONT_FAMILY_KEY = "myscriptic-reader-pref-font-family"
+const READER_PREF_LINE_HEIGHT_KEY = "myscriptic-reader-pref-line-height"
+const READER_PREF_IMMERSIVE_KEY = "myscriptic-reader-pref-immersive"
+
+function readStoredReaderTheme(): Theme {
+  if (typeof window === "undefined") return "light"
+  try {
+    const v = sessionStorage.getItem(READER_PREF_THEME_KEY)
+    if (v === "light" || v === "dark" || v === "sepia") return v
+  } catch {
+    /* ignore */
+  }
+  return "light"
+}
+
+function readStoredReaderFontSize(): FontSize {
+  if (typeof window === "undefined") return 18
+  try {
+    const n = Number(sessionStorage.getItem(READER_PREF_FONT_SIZE_KEY))
+    if (n === 14 || n === 16 || n === 18 || n === 20 || n === 22) return n
+  } catch {
+    /* ignore */
+  }
+  return 18
+}
+
+function readStoredReaderFontFamily(): FontFamily {
+  if (typeof window === "undefined") return "serif"
+  try {
+    const v = sessionStorage.getItem(READER_PREF_FONT_FAMILY_KEY)
+    if (v === "serif" || v === "sans") return v
+  } catch {
+    /* ignore */
+  }
+  return "serif"
+}
+
+function readStoredReaderLineHeight(): LineHeightPreset {
+  if (typeof window === "undefined") return "comfortable"
+  try {
+    const v = sessionStorage.getItem(READER_PREF_LINE_HEIGHT_KEY)
+    if (v === "compact" || v === "comfortable" || v === "spacious") return v
+  } catch {
+    /* ignore */
+  }
+  return "comfortable"
+}
+
+function readStoredReaderImmersive(): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return sessionStorage.getItem(READER_PREF_IMMERSIVE_KEY) === "1"
+  } catch {
+    return false
+  }
+}
+
+const LINE_HEIGHTS: Record<LineHeightPreset, number> = {
+  compact: 1.55,
+  comfortable: 1.8,
+  spacious: 2.15,
+}
 
 const THEME_STYLES: Record<Theme, { bg: string; text: string; label: string }> = {
   light: { bg: "bg-white",         text: "text-gray-900",  label: "Light" },
   dark:  { bg: "bg-gray-900",      text: "text-gray-100",  label: "Dark"  },
   sepia: { bg: "bg-amber-50",      text: "text-amber-950", label: "Sepia" },
 }
+
+function readerToolbarBar(theme: Theme) {
+  if (theme === "dark") {
+    return "bg-gray-950/90 border-gray-700/80 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.65)]"
+  }
+  if (theme === "sepia") {
+    return "bg-amber-50/95 border-amber-200/90 shadow-[0_8px_30px_-8px_rgba(120,53,15,0.12)]"
+  }
+  return "bg-white/95 border-gray-200/90 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.08)]"
+}
+
+function readerToolCluster(theme: Theme) {
+  return cn(
+    "flex items-center gap-0.5 rounded-2xl border p-1 shrink-0",
+    theme === "dark" && "border-gray-600/45 bg-gray-900/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+    theme === "sepia" && "border-amber-300/50 bg-amber-100/40 shadow-sm",
+    theme === "light" && "border-gray-200/90 bg-white/70 shadow-sm"
+  )
+}
+
+function readerSettingsCard(theme: Theme) {
+  return cn(
+    "rounded-2xl border p-4 sm:p-5 transition-shadow",
+    theme === "dark" &&
+      "border-gray-700/80 bg-gradient-to-br from-gray-800/80 to-gray-900/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
+    theme === "sepia" && "border-amber-200/90 bg-gradient-to-br from-amber-100/90 to-amber-50/95 shadow-sm",
+    theme === "light" && "border-gray-200 bg-gradient-to-br from-white to-gray-50/90 shadow-sm"
+  )
+}
+
+function readerBookChip(theme: Theme) {
+  return cn(
+    "rounded-2xl border px-3 py-2 sm:px-4 sm:py-2.5 min-w-0 flex-1 max-w-xl mx-auto backdrop-blur-md",
+    theme === "dark" &&
+      "border-gray-600/50 bg-gradient-to-br from-gray-800/95 via-gray-900/90 to-gray-950/95 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_12px_40px_-16px_rgba(0,0,0,0.5)]",
+    theme === "sepia" &&
+      "border-amber-200/80 bg-gradient-to-br from-amber-100/95 to-amber-50/90 shadow-md shadow-amber-900/5",
+    theme === "light" &&
+      "border-gray-200/90 bg-gradient-to-br from-white to-gray-50/95 shadow-md shadow-gray-900/5"
+  )
+}
+
+function readerTocAside(theme: Theme) {
+  if (theme === "dark") return "bg-gray-900"
+  if (theme === "sepia") return "bg-amber-50"
+  return "bg-white"
+}
+
+const TOC_FROM_PAGES = MOCK_PAGES.map(p => ({
+  page: p.page,
+  label: (p.content.split("\n")[0] ?? `Page ${p.page}`).trim().slice(0, 96),
+}))
 
 // ── Access Denied Screens ─────────────────────────────────────────────────────
 
@@ -381,11 +512,61 @@ function ReaderContent() {
 
   // ── Reader state ────────────────────────────────────────────────────────────
   const [currentPage,  setCurrentPage]  = React.useState(1)
-  const [theme,        setTheme]        = React.useState<Theme>("light")
-  const [fontSize,     setFontSize]     = React.useState<FontSize>(18)
+  const [theme,        setTheme]        = React.useState<Theme>(readStoredReaderTheme)
+  const [fontSize,     setFontSize]     = React.useState<FontSize>(readStoredReaderFontSize)
+  const [fontFamily,   setFontFamily]   = React.useState<FontFamily>(readStoredReaderFontFamily)
+  const [lineHeight,   setLineHeight]   = React.useState<LineHeightPreset>(readStoredReaderLineHeight)
   const [showSettings, setShowSettings] = React.useState(false)
   const [showToc,      setShowToc]      = React.useState(false)
   const [showToolbar,  setShowToolbar]  = React.useState(true)
+  const [readerHelpOpen, setReaderHelpOpen] = React.useState(false)
+  /** When off (default), top/bottom bars stay visible so navigation and settings are always discoverable. */
+  const [immersiveMode, setImmersiveMode] = React.useState(readStoredReaderImmersive)
+  const [bookmarkPage, setBookmarkPage] = React.useState<number | null>(null)
+  const [readingLayout, setReadingLayoutState] = React.useState<ReadingLayout>(() => {
+    if (typeof window === "undefined") return "vertical"
+    try {
+      const v = sessionStorage.getItem(READING_LAYOUT_KEY)
+      return v === "horizontal" ? "horizontal" : "vertical"
+    } catch {
+      return "vertical"
+    }
+  })
+  const horizontalScrollRef = React.useRef<HTMLDivElement>(null)
+  const readerHelpPanelRef = React.useRef<HTMLDivElement>(null)
+  const readerHelpCloseRef = React.useRef<HTMLButtonElement>(null)
+  const readingLayoutRef = React.useRef<ReadingLayout>(readingLayout)
+  readingLayoutRef.current = readingLayout
+  const currentPageRef = React.useRef(currentPage)
+  currentPageRef.current = currentPage
+  const readerHelpOpenRef = React.useRef(readerHelpOpen)
+  const showTocRef = React.useRef(showToc)
+  readerHelpOpenRef.current = readerHelpOpen
+  showTocRef.current = showToc
+  const bodyOverflowBackupRef = React.useRef<string | null>(null)
+
+  const [autoScrollOn, setAutoScrollOn] = React.useState(false)
+  const [autoScrollSpeed, setAutoScrollSpeed] = React.useState(AUTO_SCROLL_SPEED_DEFAULT)
+  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false)
+  const autoScrollSpeedRef = React.useRef(AUTO_SCROLL_SPEED_DEFAULT)
+  autoScrollSpeedRef.current = autoScrollSpeed
+
+  const setReadingLayout = React.useCallback((next: ReadingLayout) => {
+    setReadingLayoutState(next)
+    try {
+      sessionStorage.setItem(READING_LAYOUT_KEY, next)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const scrollVerticalToSection = React.useCallback(
+    (page: number, behavior: ScrollBehavior = "smooth") => {
+      const b: ScrollBehavior = prefersReducedMotion ? "auto" : behavior
+      document.getElementById(`reader-section-${page}`)?.scrollIntoView({ behavior: b, block: "start" })
+    },
+    [prefersReducedMotion]
+  )
 
   // Restore last-read page from engagement record
   React.useEffect(() => {
@@ -393,12 +574,20 @@ function ReaderContent() {
     if (laravelPhase3Enabled() && /^\d+$/.test(routeId)) {
       progressApi.get(routeId).then(r => {
         if (r.page_number > 0) {
-          setCurrentPage(Math.min(r.page_number, MOCK_PAGES.length))
+          const p = Math.min(r.page_number, MOCK_PAGES.length)
+          setCurrentPage(p)
+          requestAnimationFrame(() => {
+            if (readingLayoutRef.current === "vertical") scrollVerticalToSection(p, "auto")
+          })
         }
       }).catch(() => {
         const saved = engagementStore.getByUserBook(user.id, engagementBookId)
         if (saved && saved.pagesRead > 0) {
-          setCurrentPage(Math.min(saved.pagesRead, MOCK_PAGES.length))
+          const restored = Math.min(saved.pagesRead, MOCK_PAGES.length)
+          setCurrentPage(restored)
+          requestAnimationFrame(() => {
+            if (readingLayoutRef.current === "vertical") scrollVerticalToSection(restored, "auto")
+          })
         }
       })
       return
@@ -407,11 +596,92 @@ function ReaderContent() {
     if (saved && saved.pagesRead > 0) {
       const restored = Math.min(saved.pagesRead, MOCK_PAGES.length)
       setCurrentPage(restored)
+      requestAnimationFrame(() => {
+        if (readingLayoutRef.current === "vertical") scrollVerticalToSection(restored, "auto")
+      })
     }
-  }, [accessState, user, engagementBookId, routeId])
+  }, [accessState, user, engagementBookId, routeId, scrollVerticalToSection])
 
-  // Auto-hide toolbar
   React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(`myscriptic-reader-bm-${engagementBookId}`)
+      if (raw == null) {
+        setBookmarkPage(null)
+        return
+      }
+      const n = Number(raw)
+      setBookmarkPage(Number.isFinite(n) ? n : null)
+    } catch {
+      setBookmarkPage(null)
+    }
+  }, [engagementBookId])
+
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(READER_PREF_THEME_KEY, theme)
+      sessionStorage.setItem(READER_PREF_FONT_SIZE_KEY, String(fontSize))
+      sessionStorage.setItem(READER_PREF_FONT_FAMILY_KEY, fontFamily)
+      sessionStorage.setItem(READER_PREF_LINE_HEIGHT_KEY, lineHeight)
+      sessionStorage.setItem(READER_PREF_IMMERSIVE_KEY, immersiveMode ? "1" : "0")
+    } catch {
+      /* ignore */
+    }
+  }, [theme, fontSize, fontFamily, lineHeight, immersiveMode])
+
+  React.useEffect(() => {
+    try {
+      const on = sessionStorage.getItem(AUTO_SCROLL_ON_KEY)
+      if (on === "1") setAutoScrollOn(true)
+      const s = sessionStorage.getItem(AUTO_SCROLL_SPEED_KEY)
+      if (s != null) {
+        const n = Number(s)
+        if (Number.isFinite(n) && n >= AUTO_SCROLL_SPEED_MIN && n <= AUTO_SCROLL_SPEED_MAX) {
+          setAutoScrollSpeed(n)
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(AUTO_SCROLL_ON_KEY, autoScrollOn ? "1" : "0")
+    } catch {
+      /* ignore */
+    }
+  }, [autoScrollOn])
+
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(AUTO_SCROLL_SPEED_KEY, String(autoScrollSpeed))
+    } catch {
+      /* ignore */
+    }
+  }, [autoScrollSpeed])
+
+  React.useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const apply = () => setPrefersReducedMotion(mq.matches)
+    apply()
+    mq.addEventListener("change", apply)
+    return () => mq.removeEventListener("change", apply)
+  }, [])
+
+  React.useEffect(() => {
+    if (readingLayout !== "vertical") setAutoScrollOn(false)
+  }, [readingLayout])
+
+  React.useEffect(() => {
+    if (prefersReducedMotion) setAutoScrollOn(false)
+  }, [prefersReducedMotion])
+
+  // Optional immersive mode: hide chrome after idle. Default keeps bars visible.
+  React.useEffect(() => {
+    if (!immersiveMode) {
+      setShowToolbar(true)
+      return
+    }
     let timeout: ReturnType<typeof setTimeout>
     const handle = () => {
       setShowToolbar(true)
@@ -420,12 +690,300 @@ function ReaderContent() {
     }
     window.addEventListener("mousemove", handle)
     window.addEventListener("touchstart", handle)
+    handle()
     return () => {
       window.removeEventListener("mousemove", handle)
       window.removeEventListener("touchstart", handle)
       clearTimeout(timeout)
     }
-  }, [])
+  }, [immersiveMode])
+
+  const goTo = React.useCallback(
+    (page: number) => {
+      setAutoScrollOn(false)
+      const p = Math.max(1, Math.min(page, MOCK_PAGES.length))
+      setCurrentPage(p)
+      queueMicrotask(() => {
+        if (readingLayoutRef.current === "vertical") scrollVerticalToSection(p, "smooth")
+      })
+    },
+    [scrollVerticalToSection]
+  )
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement
+      if (el.closest('[role="slider"]') || el.tagName === "INPUT" || el.tagName === "TEXTAREA") return
+      if (e.key === "ArrowLeft") {
+        e.preventDefault()
+        setCurrentPage(p => {
+          const next = Math.max(1, p - 1)
+          queueMicrotask(() => {
+            if (readingLayoutRef.current === "vertical") scrollVerticalToSection(next, "smooth")
+          })
+          return next
+        })
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault()
+        setCurrentPage(p => {
+          const next = Math.min(MOCK_PAGES.length, p + 1)
+          queueMicrotask(() => {
+            if (readingLayoutRef.current === "vertical") scrollVerticalToSection(next, "smooth")
+          })
+          return next
+        })
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [scrollVerticalToSection])
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement
+      const inField =
+        el.closest('[role="slider"]') != null || el.tagName === "INPUT" || el.tagName === "TEXTAREA"
+
+      if (e.key === "Escape") {
+        if (readerHelpOpen) {
+          e.preventDefault()
+          setReaderHelpOpen(false)
+          return
+        }
+        if (showToc) {
+          e.preventDefault()
+          setShowToc(false)
+          return
+        }
+        if (showSettings) {
+          e.preventDefault()
+          setShowSettings(false)
+          return
+        }
+        return
+      }
+
+      if (inField) return
+      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+        e.preventDefault()
+        setReaderHelpOpen(v => !v)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [readerHelpOpen, showToc, showSettings])
+
+  React.useEffect(() => {
+    if (!readerHelpOpen) return
+    const previous = document.activeElement as HTMLElement | null
+    const id = requestAnimationFrame(() => {
+      readerHelpCloseRef.current?.focus()
+    })
+    return () => {
+      cancelAnimationFrame(id)
+      if (previous && document.body.contains(previous) && typeof previous.focus === "function") {
+        try {
+          previous.focus()
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }, [readerHelpOpen])
+
+  React.useEffect(() => {
+    if (!readerHelpOpen) return
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return
+      const panel = readerHelpPanelRef.current
+      if (!panel) return
+      const nodes = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+        )
+      ).filter(el => !el.closest("[aria-hidden='true']"))
+      if (nodes.length === 0) return
+      const first = nodes[0]
+      const last = nodes[nodes.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey) {
+        if (active === first) {
+          e.preventDefault()
+          last.focus()
+        }
+      } else if (active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener("keydown", onTab)
+    return () => document.removeEventListener("keydown", onTab)
+  }, [readerHelpOpen])
+
+  React.useEffect(() => {
+    const locked = readerHelpOpen || showToc
+    if (!locked) return
+    if (bodyOverflowBackupRef.current === null) {
+      bodyOverflowBackupRef.current = document.body.style.overflow || ""
+    }
+    document.body.style.overflow = "hidden"
+    return () => {
+      if (!readerHelpOpenRef.current && !showTocRef.current && bodyOverflowBackupRef.current !== null) {
+        document.body.style.overflow = bodyOverflowBackupRef.current
+        bodyOverflowBackupRef.current = null
+      }
+    }
+  }, [readerHelpOpen, showToc])
+
+  /** Horizontal carousel: sync page from swipe / scroll. */
+  React.useEffect(() => {
+    if (readingLayout !== "horizontal") return
+    const el = horizontalScrollRef.current
+    if (!el) return
+    const onScroll = () => {
+      const w = el.clientWidth
+      if (w <= 0) return
+      const idx = Math.round(el.scrollLeft / w)
+      const page = Math.min(MOCK_PAGES.length, Math.max(1, idx + 1))
+      setCurrentPage(prev => (prev === page ? prev : page))
+    }
+    el.addEventListener("scroll", onScroll, { passive: true })
+    return () => el.removeEventListener("scroll", onScroll)
+  }, [readingLayout])
+
+  /** Horizontal: keep carousel aligned when page changes (buttons, slider, TOC, keyboard). */
+  React.useEffect(() => {
+    if (readingLayout !== "horizontal") return
+    const el = horizontalScrollRef.current
+    if (!el) return
+    const w = el.clientWidth
+    if (w <= 0) return
+    const target = (currentPage - 1) * w
+    if (Math.abs(el.scrollLeft - target) > 3) {
+      el.scrollTo({ left: target, behavior: prefersReducedMotion ? "auto" : "smooth" })
+    }
+  }, [currentPage, readingLayout, prefersReducedMotion])
+
+  React.useLayoutEffect(() => {
+    const el = horizontalScrollRef.current
+    if (!el || readingLayout !== "horizontal") return
+    const w = el.clientWidth
+    if (w > 0) el.scrollLeft = (currentPage - 1) * w
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only snap when toggling layout; page changes use scroll effect
+  }, [readingLayout])
+
+  /** Keep horizontal page aligned when the carousel width changes (resize, rotation). */
+  React.useEffect(() => {
+    if (readingLayout !== "horizontal") return
+    const el = horizontalScrollRef.current
+    if (!el) return
+    const sync = () => {
+      const w = el.clientWidth
+      if (w <= 0) return
+      el.scrollLeft = (currentPageRef.current - 1) * w
+    }
+    const ro = new ResizeObserver(sync)
+    ro.observe(el)
+    window.addEventListener("resize", sync)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener("resize", sync)
+    }
+  }, [readingLayout])
+
+  /** When switching from horizontal → vertical, align scroll with the active section. */
+  const prevReadingLayoutRef = React.useRef<ReadingLayout | null>(null)
+  React.useEffect(() => {
+    const prev = prevReadingLayoutRef.current
+    prevReadingLayoutRef.current = readingLayout
+    if (readingLayout !== "vertical" || prev !== "horizontal") return
+    requestAnimationFrame(() => {
+      scrollVerticalToSection(currentPage, "auto")
+    })
+  }, [readingLayout, currentPage, scrollVerticalToSection])
+
+  /** Vertical scroll: update current section from viewport (no scroll — avoids fighting the reader). */
+  React.useEffect(() => {
+    if (readingLayout !== "vertical") return
+    const roots = MOCK_PAGES.map(p => document.getElementById(`reader-section-${p.page}`)).filter(
+      (n): n is HTMLElement => n != null
+    )
+    if (roots.length === 0) return
+    let raf = 0
+    const io = new IntersectionObserver(
+      entries => {
+        cancelAnimationFrame(raf)
+        raf = requestAnimationFrame(() => {
+          const visible = entries
+            .filter(e => e.isIntersecting && e.target instanceof HTMLElement)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+          const id = visible?.target?.id
+          if (!id?.startsWith("reader-section-")) return
+          const n = Number(id.slice("reader-section-".length))
+          if (!Number.isFinite(n)) return
+          setCurrentPage(prev => (prev === n ? prev : n))
+        })
+      },
+      { root: null, rootMargin: "-18% 0px -40% 0px", threshold: [0, 0.2, 0.4, 0.6, 0.85, 1] }
+    )
+    roots.forEach(node => io.observe(node))
+    return () => {
+      cancelAnimationFrame(raf)
+      io.disconnect()
+    }
+  }, [readingLayout])
+
+  /** Vertical continuous scroll: smooth auto-advance at user-chosen px/s. */
+  React.useEffect(() => {
+    if (!autoScrollOn || readingLayout !== "vertical") return
+    let last = performance.now()
+    let rafId = 0
+    const tick = (now: number) => {
+      const dt = Math.min(80, now - last) / 1000
+      last = now
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight
+      if (maxScroll <= 0 || window.scrollY >= maxScroll - 2) {
+        setAutoScrollOn(false)
+        return
+      }
+      window.scrollBy({ top: autoScrollSpeedRef.current * dt, left: 0, behavior: "auto" })
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [autoScrollOn, readingLayout])
+
+  /** Stop auto-scroll when the reader scrolls or pages manually. */
+  React.useEffect(() => {
+    if (!autoScrollOn) return
+    const cancel = () => setAutoScrollOn(false)
+    window.addEventListener("wheel", cancel, { passive: true })
+    window.addEventListener("touchmove", cancel, { passive: true })
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement
+      if (el.closest('[role="slider"]') || el.tagName === "INPUT" || el.tagName === "TEXTAREA") return
+      const k = e.key
+      if (
+        k === "ArrowUp" ||
+        k === "ArrowDown" ||
+        k === "ArrowLeft" ||
+        k === "ArrowRight" ||
+        k === "PageUp" ||
+        k === "PageDown" ||
+        k === "Home" ||
+        k === "End" ||
+        k === " "
+      ) {
+        cancel()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => {
+      window.removeEventListener("wheel", cancel)
+      window.removeEventListener("touchmove", cancel)
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [autoScrollOn])
 
   // Engagement tracker (only active when access allowed)
   const { lastSave, elapsedSecRef } = useEngagementTracker(
@@ -435,11 +993,27 @@ function ReaderContent() {
     TOTAL_PAGES
   )
 
-  const pageData    = MOCK_PAGES.find(p => p.page === currentPage) ?? MOCK_PAGES[MOCK_PAGES.length - 1]
   const progressPct = Math.round((currentPage / TOTAL_PAGES) * 100)
   const styles      = THEME_STYLES[theme]
 
-  const goTo = (page: number) => setCurrentPage(Math.max(1, Math.min(page, MOCK_PAGES.length)))
+  const saveBookmark = React.useCallback(() => {
+    try {
+      sessionStorage.setItem(`myscriptic-reader-bm-${engagementBookId}`, String(currentPage))
+      setBookmarkPage(currentPage)
+    } catch {
+      /* ignore */
+    }
+  }, [engagementBookId, currentPage])
+
+  const goToBookmark = React.useCallback(() => {
+    if (bookmarkPage == null) return
+    goTo(Math.max(1, Math.min(bookmarkPage, MOCK_PAGES.length)))
+  }, [bookmarkPage, goTo])
+
+  const toggleAutoScroll = React.useCallback(() => {
+    if (prefersReducedMotion || readingLayout !== "vertical") return
+    setAutoScrollOn(v => !v)
+  }, [prefersReducedMotion, readingLayout])
 
   // ── Loading / Access gate renders ─────────────────────────────────────────
   if (isLoading || accessState === "checking") {
@@ -459,141 +1033,909 @@ function ReaderContent() {
 
   // ── Full reader UI ─────────────────────────────────────────────────────────
   return (
-    <div className={cn("min-h-screen flex flex-col transition-colors duration-300", styles.bg)}>
-
-      {/* Top toolbar */}
+    <div
+      className={cn(
+        "min-h-screen flex flex-col",
+        prefersReducedMotion ? "transition-none" : "transition-colors duration-300",
+        styles.bg
+      )}
+    >
+      {/* Always-visible book progress (full title length) */}
       <div
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-          showToolbar ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full",
-          theme === "dark" ? "bg-gray-900/95 border-gray-700" : "bg-white/95 border-gray-200",
-          "backdrop-blur-md border-b shadow-sm"
+          "fixed top-0 left-0 right-0 z-[60] h-1 overflow-hidden",
+          theme === "dark" ? "bg-gray-800" : theme === "sepia" ? "bg-amber-200/80" : "bg-gray-200"
+        )}
+        role="progressbar"
+        aria-valuenow={progressPct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Reading progress in this title"
+      >
+        <div
+          className={cn(
+            "h-full bg-brand ease-out",
+            prefersReducedMotion ? "transition-none" : "transition-[width] duration-300"
+          )}
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+
+      {/* Top toolbar — layered reader chrome */}
+      <div
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 pt-1",
+          prefersReducedMotion ? "transition-none" : "transition-all duration-300",
+          showToolbar ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none",
+          readerToolbarBar(theme),
+          "backdrop-blur-xl border-b"
         )}
       >
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href={`/books/${book.id}`}>
-              <Button variant="ghost" size="sm" className={cn("gap-1.5", theme === "dark" ? "text-gray-300 hover:text-white hover:bg-gray-800" : "")}>
-                <ChevronLeft size={15} />
-                Back
-              </Button>
-            </Link>
-            <div className="hidden sm:block">
-              <p className="text-sm font-semibold truncate max-w-[200px]" style={{ color: theme === "dark" ? "#f3f4f6" : "#111827" }}>
-                {book.title}
-              </p>
-              <p className="text-xs flex items-center gap-1" style={{ color: theme === "dark" ? "#9ca3af" : "#6b7280" }}>
-                {book.author}
-                {lastSave && (
-                  <span className="inline-flex items-center gap-1 ml-2 text-[10px] opacity-70">
-                    <CheckCircle size={9} className="text-green-500" />
-                    Saved
-                  </span>
-                )}
-              </p>
+        <span id="elapsed-timer" className="sr-only">
+          0:00 reading
+        </span>
+        <div className="max-w-5xl mx-auto px-3 sm:px-5">
+          <div className="flex items-center gap-2 sm:gap-3 min-h-[3.25rem] py-1">
+            <div className={readerToolCluster(theme)}>
+              <Link href={`/books/${book.id}`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "gap-1.5 h-9 rounded-xl px-2.5",
+                    theme === "dark" && "text-gray-200 hover:text-white hover:bg-gray-700/80",
+                    theme === "sepia" && "text-amber-950 hover:bg-amber-200/60",
+                    theme === "light" && "text-gray-800 hover:bg-gray-100"
+                  )}
+                >
+                  <ChevronLeft size={16} />
+                  <span className="hidden sm:inline text-xs font-medium">Back</span>
+                </Button>
+              </Link>
+              <Link href="/library">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "gap-1.5 h-9 rounded-xl px-2.5 hidden sm:inline-flex",
+                    theme === "dark" && "text-gray-200 hover:text-white hover:bg-gray-700/80",
+                    theme === "sepia" && "text-amber-950 hover:bg-amber-200/60",
+                    theme === "light" && "text-gray-800 hover:bg-gray-100"
+                  )}
+                >
+                  <Library size={15} />
+                  <span className="text-xs font-medium">Library</span>
+                </Button>
+              </Link>
             </div>
-          </div>
 
-          <div className="flex-1 max-w-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-xs shrink-0" style={{ color: theme === "dark" ? "#9ca3af" : "#6b7280" }}>
+            <div className="flex-1 min-w-0 flex sm:hidden items-center gap-2 px-1">
+              <span
+                className={cn(
+                  "text-[10px] font-semibold tabular-nums shrink-0",
+                  theme === "dark" && "text-brand",
+                  theme === "sepia" && "text-brand",
+                  theme === "light" && "text-brand"
+                )}
+              >
                 {progressPct}%
               </span>
-              <Progress value={progressPct} className="h-1.5" />
-              <span className="text-xs shrink-0" style={{ color: theme === "dark" ? "#9ca3af" : "#6b7280" }}>
+              <Progress value={progressPct} className="h-1 flex-1 min-w-0 [&>div]:bg-brand" />
+              <span
+                className={cn(
+                  "text-[10px] tabular-nums shrink-0",
+                  theme === "dark" && "text-gray-400",
+                  theme === "sepia" && "text-amber-900/70",
+                  theme === "light" && "text-gray-500"
+                )}
+              >
                 p.{currentPage}
               </span>
             </div>
-          </div>
 
-          <div className="flex items-center gap-1">
-            {/* Access type badge */}
-            <Badge
-              className={cn(
-                "text-[10px] border-0 mr-1",
-                book.accessType === "FREE"
-                  ? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                  : book.accessType === "SUBSCRIPTION"
-                  ? "bg-brand/20 text-brand"
-                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+            <div className={cn("hidden sm:flex min-w-0 flex-1", readerBookChip(theme))}>
+              <div className="min-w-0 flex-1 flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h1
+                      className={cn(
+                        "text-sm sm:text-[0.95rem] font-serif font-semibold leading-snug tracking-tight truncate",
+                        theme === "dark" && "text-gray-50",
+                        theme === "sepia" && "text-amber-950",
+                        theme === "light" && "text-gray-900"
+                      )}
+                    >
+                      {book.title}
+                    </h1>
+                    <p
+                      className={cn(
+                        "text-[11px] mt-0.5 truncate flex items-center gap-2",
+                        theme === "dark" && "text-gray-400",
+                        theme === "sepia" && "text-amber-900/75",
+                        theme === "light" && "text-gray-600"
+                      )}
+                    >
+                      <span>{book.author}</span>
+                      {lastSave ? (
+                        <span className="inline-flex items-center gap-0.5 text-emerald-500/90 shrink-0">
+                          <CheckCircle size={10} />
+                          <span className="text-[10px] font-medium">Synced</span>
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+                  <Badge
+                    className={cn(
+                      "shrink-0 text-[9px] uppercase tracking-wide px-2 py-0.5 border-0 font-semibold",
+                      book.accessType === "FREE"
+                        ? "bg-emerald-500/15 text-emerald-400"
+                        : book.accessType === "SUBSCRIPTION"
+                          ? "bg-brand/25 text-brand"
+                          : "bg-amber-500/15 text-amber-400"
+                    )}
+                  >
+                    {book.accessType}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "text-[11px] font-bold tabular-nums w-8 shrink-0",
+                      theme === "dark" && "text-brand",
+                      theme === "sepia" && "text-brand",
+                      theme === "light" && "text-brand"
+                    )}
+                  >
+                    {progressPct}%
+                  </span>
+                  <Progress value={progressPct} className="h-1.5 flex-1 min-w-0 [&>div]:shadow-[0_0_12px_rgba(249,115,22,0.35)]" />
+                  <span
+                    className={cn(
+                      "text-[10px] tabular-nums shrink-0 w-14 text-right",
+                      theme === "dark" && "text-gray-400",
+                      theme === "sepia" && "text-amber-900/70",
+                      theme === "light" && "text-gray-500"
+                    )}
+                  >
+                    p.{currentPage}/{MOCK_PAGES.length}
+                  </span>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums shrink-0 border",
+                      theme === "dark" && "border-gray-600/60 bg-gray-950/50 text-gray-300",
+                      theme === "sepia" && "border-amber-300/60 bg-amber-200/40 text-amber-950",
+                      theme === "light" && "border-gray-200 bg-white/80 text-gray-700"
+                    )}
+                  >
+                    <Clock size={11} className="opacity-80" aria-hidden />
+                    <span id="elapsed-toolbar">0:00</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className={cn(readerToolCluster(theme))}>
+              {readingLayout === "vertical" && (
+                <button
+                  type="button"
+                  onClick={toggleAutoScroll}
+                  disabled={prefersReducedMotion}
+                  aria-pressed={autoScrollOn}
+                  className={cn(
+                    "p-2 rounded-xl transition-all disabled:opacity-35",
+                    autoScrollOn && "text-brand bg-brand/15 ring-1 ring-brand/35",
+                    !autoScrollOn &&
+                      (theme === "dark"
+                        ? "text-gray-400 hover:text-white hover:bg-gray-700/80"
+                        : theme === "sepia"
+                          ? "text-amber-900 hover:bg-amber-200/50"
+                          : "text-gray-600 hover:bg-gray-100")
+                  )}
+                  title={
+                    prefersReducedMotion
+                      ? "Auto-scroll off (reduced motion)"
+                      : autoScrollOn
+                        ? "Pause auto-scroll"
+                        : "Auto-scroll — hands-free reading (vertical mode)"
+                  }
+                  aria-label={autoScrollOn ? "Pause auto-scroll" : "Start auto-scroll"}
+                >
+                  {autoScrollOn ? <Pause size={17} /> : <Play size={17} />}
+                </button>
               )}
-            >
-              {book.accessType}
-            </Badge>
-            <button
-              onClick={() => setShowToc(t => !t)}
-              className={cn("p-2 rounded-lg transition-colors", theme === "dark" ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100")}
-              aria-label="Table of contents"
-            >
-              <List size={16} />
-            </button>
-            <button
-              onClick={() => setShowSettings(s => !s)}
-              className={cn("p-2 rounded-lg transition-colors", theme === "dark" ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100")}
-              aria-label="Reader settings"
-            >
-              <Settings size={16} />
-            </button>
+              <button
+                type="button"
+                onClick={saveBookmark}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  bookmarkPage === currentPage
+                    ? "text-brand bg-brand/15 ring-1 ring-brand/30"
+                    : theme === "dark"
+                      ? "text-gray-400 hover:text-white hover:bg-gray-700/80"
+                      : theme === "sepia"
+                        ? "text-amber-900 hover:bg-amber-200/50"
+                        : "text-gray-600 hover:bg-gray-100"
+                )}
+                title="Bookmark this section"
+                aria-label="Bookmark this page"
+              >
+                <Bookmark size={17} className={bookmarkPage === currentPage ? "fill-current" : ""} />
+              </button>
+              <button
+                type="button"
+                onClick={goToBookmark}
+                disabled={bookmarkPage == null}
+                className={cn(
+                  "p-2 rounded-xl transition-all disabled:opacity-35",
+                  theme === "dark"
+                    ? "text-gray-400 hover:text-white hover:bg-gray-700/80"
+                    : theme === "sepia"
+                      ? "text-amber-900 hover:bg-amber-200/50"
+                      : "text-gray-600 hover:bg-gray-100"
+                )}
+                title={bookmarkPage != null ? `Jump to bookmark (section ${bookmarkPage})` : "No bookmark"}
+                aria-label="Go to bookmarked page"
+              >
+                <BookOpen size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowToc(t => !t)}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  theme === "dark"
+                    ? "text-gray-400 hover:text-white hover:bg-gray-700/80"
+                    : theme === "sepia"
+                      ? "text-amber-900 hover:bg-amber-200/50"
+                      : "text-gray-600 hover:bg-gray-100"
+                )}
+                aria-label="Table of contents"
+              >
+                <List size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setReaderHelpOpen(v => !v)}
+                aria-expanded={readerHelpOpen}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  readerHelpOpen && "ring-2 ring-brand/40 ring-offset-2 ring-offset-transparent",
+                  theme === "dark"
+                    ? "text-gray-400 hover:text-white hover:bg-gray-700/80"
+                    : theme === "sepia"
+                      ? "text-amber-900 hover:bg-amber-200/50"
+                      : "text-gray-600 hover:bg-gray-100"
+                )}
+                title="Shortcuts (?)"
+                aria-label="Keyboard shortcuts"
+              >
+                <HelpCircle size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSettings(s => !s)}
+                aria-expanded={showSettings}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  showSettings && "ring-2 ring-brand/50 ring-offset-2 ring-offset-transparent",
+                  theme === "dark"
+                    ? "text-gray-400 hover:text-white hover:bg-gray-700/80"
+                    : theme === "sepia"
+                      ? "text-amber-900 hover:bg-amber-200/50"
+                      : "text-gray-600 hover:bg-gray-100"
+                )}
+                aria-label="Reader settings"
+              >
+                <Settings size={17} />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Settings panel */}
         {showSettings && (
-          <div className={cn(
-            "border-t px-4 py-4 max-w-4xl mx-auto",
-            theme === "dark" ? "border-gray-700 bg-gray-900" : "border-gray-100 bg-white"
-          )}>
-            <div className="flex flex-wrap gap-8 items-center">
-              {/* Theme */}
-              <div>
-                <p className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Theme</p>
-                <div className="flex gap-2">
-                  {(["light", "dark", "sepia"] as Theme[]).map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setTheme(t)}
+          <div
+            className={cn(
+              "border-t px-3 sm:px-5 py-4 sm:py-5 bg-gradient-to-b from-transparent to-black/[0.08] dark:to-black/20 max-h-[min(26rem,58vh)] sm:max-h-[min(32rem,64vh)] overflow-y-auto overscroll-y-contain",
+              theme === "sepia" && "to-amber-900/[0.04]",
+              theme === "light" && "to-gray-900/[0.03]"
+            )}
+          >
+            <div className="max-w-5xl mx-auto">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles size={16} className="text-brand shrink-0" aria-hidden />
+                <div>
+                  <p
+                    className={cn(
+                      "text-xs font-bold uppercase tracking-[0.2em]",
+                      theme === "dark" && "text-gray-400",
+                      theme === "sepia" && "text-amber-800/80",
+                      theme === "light" && "text-gray-500"
+                    )}
+                  >
+                    Reading studio
+                  </p>
+                  <p
+                    className={cn(
+                      "text-sm font-semibold",
+                      theme === "dark" && "text-gray-100",
+                      theme === "sepia" && "text-amber-950",
+                      theme === "light" && "text-gray-900"
+                    )}
+                  >
+                    Tune how this book feels on your screen
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+                <section className={readerSettingsCard(theme)}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
                       className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
-                        theme === t ? "border-brand bg-brand/10 text-brand" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                        "p-2.5 rounded-xl",
+                        theme === "dark" ? "bg-orange-500/15 text-orange-400" : "bg-brand/10 text-brand"
                       )}
                     >
-                      {t === "light" && <Sun size={12} className="inline mr-1" />}
-                      {t === "dark"  && <Moon size={12} className="inline mr-1" />}
-                      {THEME_STYLES[t].label}
+                      <Palette size={18} aria-hidden />
+                    </div>
+                    <div>
+                      <h3
+                        className={cn(
+                          "text-[11px] font-bold uppercase tracking-wider",
+                          theme === "dark" && "text-gray-400",
+                          theme === "sepia" && "text-amber-800/90",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Appearance
+                      </h3>
+                      <p
+                        className={cn(
+                          "text-xs",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/70",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Page atmosphere
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={cn(
+                      "flex gap-1 p-1 rounded-xl",
+                      theme === "dark" && "bg-gray-950/50",
+                      theme === "sepia" && "bg-amber-200/30",
+                      theme === "light" && "bg-gray-100/80"
+                    )}
+                    role="group"
+                    aria-label="Color theme"
+                  >
+                    {(["light", "dark", "sepia"] as Theme[]).map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTheme(t)}
+                        className={cn(
+                          "flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-[10px] font-semibold transition-all border border-transparent",
+                          theme === t
+                            ? "bg-brand text-primary-foreground shadow-md shadow-brand/25 border-brand"
+                            : theme === "dark"
+                              ? "text-gray-400 hover:bg-gray-800/80 hover:text-gray-200"
+                              : theme === "sepia"
+                                ? "text-amber-900/70 hover:bg-amber-100/80"
+                                : "text-gray-600 hover:bg-white"
+                        )}
+                      >
+                        {t === "light" && <Sun size={18} strokeWidth={2} />}
+                        {t === "dark" && <Moon size={18} strokeWidth={2} />}
+                        {t === "sepia" && <span className="text-sm leading-none">☕</span>}
+                        {THEME_STYLES[t].label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className={readerSettingsCard(theme)}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className={cn(
+                        "p-2.5 rounded-xl",
+                        theme === "dark" ? "bg-sky-500/15 text-sky-400" : "bg-sky-500/10 text-sky-600"
+                      )}
+                    >
+                      <Type size={18} aria-hidden />
+                    </div>
+                    <div>
+                      <h3
+                        className={cn(
+                          "text-[11px] font-bold uppercase tracking-wider",
+                          theme === "dark" && "text-gray-400",
+                          theme === "sepia" && "text-amber-800/90",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Typography
+                      </h3>
+                      <p
+                        className={cn(
+                          "text-xs",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/70",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Font & size
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex gap-1.5">
+                      {(["serif", "sans"] as FontFamily[]).map(ff => (
+                        <button
+                          key={ff}
+                          type="button"
+                          onClick={() => setFontFamily(ff)}
+                          className={cn(
+                            "flex-1 py-2 rounded-xl text-xs font-semibold capitalize border transition-all",
+                            fontFamily === ff
+                              ? "border-brand bg-brand/12 text-brand ring-1 ring-brand/20"
+                              : theme === "dark"
+                                ? "border-gray-600 text-gray-400 hover:border-gray-500"
+                                : theme === "sepia"
+                                  ? "border-amber-200 text-amber-900/80"
+                                  : "border-gray-200 text-gray-600"
+                          )}
+                        >
+                          {ff}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFontSize(s => Math.max(14, s - 2) as FontSize)}
+                        className={cn(
+                          "p-2 rounded-xl border transition-colors",
+                          theme === "dark" ? "border-gray-600 hover:border-brand" : theme === "sepia" ? "border-amber-200 hover:border-brand" : "border-gray-200 hover:border-brand"
+                        )}
+                        aria-label="Smaller text"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <div className="text-center">
+                        <span
+                          className={cn(
+                            "text-lg font-bold tabular-nums",
+                            theme === "dark" && "text-white",
+                            theme === "sepia" && "text-amber-950",
+                            theme === "light" && "text-gray-900"
+                          )}
+                        >
+                          {fontSize}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-[10px] block uppercase tracking-wide",
+                            theme === "dark" && "text-gray-500",
+                            theme === "sepia" && "text-amber-800/70",
+                            theme === "light" && "text-gray-500"
+                          )}
+                        >
+                          px size
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFontSize(s => Math.min(22, s + 2) as FontSize)}
+                        className={cn(
+                          "p-2 rounded-xl border transition-colors",
+                          theme === "dark" ? "border-gray-600 hover:border-brand" : theme === "sepia" ? "border-amber-200 hover:border-brand" : "border-gray-200 hover:border-brand"
+                        )}
+                        aria-label="Larger text"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                <section className={readerSettingsCard(theme)}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className={cn(
+                        "p-2.5 rounded-xl",
+                        theme === "dark" ? "bg-violet-500/15 text-violet-400" : "bg-violet-500/10 text-violet-600"
+                      )}
+                    >
+                      <Rows3 size={18} aria-hidden />
+                    </div>
+                    <div>
+                      <h3
+                        className={cn(
+                          "text-[11px] font-bold uppercase tracking-wider",
+                          theme === "dark" && "text-gray-400",
+                          theme === "sepia" && "text-amber-800/90",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Line height
+                      </h3>
+                      <p
+                        className={cn(
+                          "text-xs",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/70",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Breathing room
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {(
+                      [
+                        ["compact", "Tight"],
+                        ["comfortable", "Balanced"],
+                        ["spacious", "Airy"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setLineHeight(key)}
+                        className={cn(
+                          "w-full text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all",
+                          lineHeight === key
+                            ? "border-brand bg-brand/12 text-brand"
+                            : theme === "dark"
+                              ? "border-gray-600 text-gray-400 hover:bg-gray-800/50"
+                              : theme === "sepia"
+                                ? "border-amber-200 text-amber-900/80 hover:bg-amber-100/50"
+                                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        )}
+                      >
+                        {label}
+                        <span
+                          className={cn(
+                            "block text-[10px] font-normal mt-0.5 opacity-70",
+                            theme === "dark" && "text-gray-500",
+                            theme === "sepia" && "text-amber-800/60",
+                            theme === "light" && "text-gray-500"
+                          )}
+                        >
+                          {key === "compact" && "Dense paragraphs"}
+                          {key === "comfortable" && "Default comfort"}
+                          {key === "spacious" && "Extra line space"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className={readerSettingsCard(theme)}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className={cn(
+                        "p-2.5 rounded-xl",
+                        theme === "dark" ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-500/10 text-emerald-600"
+                      )}
+                    >
+                      <Clock size={18} aria-hidden />
+                    </div>
+                    <div>
+                      <h3
+                        className={cn(
+                          "text-[11px] font-bold uppercase tracking-wider",
+                          theme === "dark" && "text-gray-400",
+                          theme === "sepia" && "text-amber-800/90",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Session & view
+                      </h3>
+                      <p
+                        className={cn(
+                          "text-xs",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/70",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Time on book · chrome
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={cn(
+                      "rounded-xl px-3 py-2.5 mb-3 border",
+                      theme === "dark" && "border-gray-600/60 bg-gray-950/40",
+                      theme === "sepia" && "border-amber-200/80 bg-amber-100/40",
+                      theme === "light" && "border-gray-200 bg-gray-50/90"
+                    )}
+                  >
+                    <p
+                      className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider mb-1",
+                        theme === "dark" && "text-gray-500",
+                        theme === "sepia" && "text-amber-800/80",
+                        theme === "light" && "text-gray-500"
+                      )}
+                    >
+                      This session
+                    </p>
+                    <p
+                      className={cn(
+                        "text-base font-semibold tabular-nums",
+                        theme === "dark" && "text-gray-100",
+                        theme === "sepia" && "text-amber-950",
+                        theme === "light" && "text-gray-900"
+                      )}
+                      data-elapsed-session
+                    >
+                      0:00 reading
+                    </p>
+                  </div>
+                  <label
+                    className={cn(
+                      "flex items-start gap-3 cursor-pointer rounded-xl p-2 -m-2 transition-colors",
+                      theme === "dark" && "hover:bg-gray-800/40",
+                      theme === "sepia" && "hover:bg-amber-100/50",
+                      theme === "light" && "hover:bg-gray-100/80"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1 rounded border-gray-400 text-brand focus:ring-brand"
+                      checked={immersiveMode}
+                      onChange={e => setImmersiveMode(e.target.checked)}
+                    />
+                    <span>
+                      <span
+                        className={cn(
+                          "text-sm font-medium block",
+                          theme === "dark" && "text-gray-200",
+                          theme === "sepia" && "text-amber-950",
+                          theme === "light" && "text-gray-800"
+                        )}
+                      >
+                        Immersive reading
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[11px] leading-snug block mt-0.5",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/65",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Auto-hide top and bottom bars after idle. Tap “Show controls” to bring them back.
+                      </span>
+                    </span>
+                  </label>
+                </section>
+              </div>
+
+              <section className={cn(readerSettingsCard(theme), "mt-1 sm:mt-2")} aria-label="Reading layout">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "rounded-xl p-2.5",
+                        theme === "dark" ? "bg-fuchsia-500/15 text-fuchsia-400" : "bg-fuchsia-500/10 text-fuchsia-700"
+                      )}
+                    >
+                      <GalleryHorizontal size={18} aria-hidden />
+                    </div>
+                    <div>
+                      <h3
+                        className={cn(
+                          "text-[11px] font-bold uppercase tracking-wider",
+                          theme === "dark" && "text-gray-400",
+                          theme === "sepia" && "text-amber-800/90",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Reading layout
+                      </h3>
+                      <p
+                        className={cn(
+                          "text-xs",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/70",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Scroll the page, or swipe between sections like slides
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={cn(
+                      "flex gap-1 rounded-xl p-1 sm:max-w-md sm:flex-1",
+                      theme === "dark" && "bg-gray-950/50",
+                      theme === "sepia" && "bg-amber-200/30",
+                      theme === "light" && "bg-gray-100/80"
+                    )}
+                    role="group"
+                    aria-label="Choose vertical or horizontal reading"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setReadingLayout("vertical")}
+                      className={cn(
+                        "flex flex-1 flex-col items-center gap-1 rounded-lg border border-transparent py-2.5 text-[10px] font-semibold transition-all sm:flex-row sm:justify-center sm:gap-2 sm:py-2",
+                        readingLayout === "vertical"
+                          ? "bg-brand text-primary-foreground shadow-md shadow-brand/25"
+                          : theme === "dark"
+                            ? "text-gray-400 hover:bg-gray-800/80 hover:text-gray-200"
+                            : theme === "sepia"
+                              ? "text-amber-900/70 hover:bg-amber-100/80"
+                              : "text-gray-600 hover:bg-white"
+                      )}
+                    >
+                      <ScrollText size={18} strokeWidth={2} aria-hidden />
+                      Vertical
+                      <span className="hidden text-[9px] font-normal opacity-90 sm:inline">Continuous scroll</span>
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => setReadingLayout("horizontal")}
+                      className={cn(
+                        "flex flex-1 flex-col items-center gap-1 rounded-lg border border-transparent py-2.5 text-[10px] font-semibold transition-all sm:flex-row sm:justify-center sm:gap-2 sm:py-2",
+                        readingLayout === "horizontal"
+                          ? "bg-brand text-primary-foreground shadow-md shadow-brand/25"
+                          : theme === "dark"
+                            ? "text-gray-400 hover:bg-gray-800/80 hover:text-gray-200"
+                            : theme === "sepia"
+                              ? "text-amber-900/70 hover:bg-amber-100/80"
+                              : "text-gray-600 hover:bg-white"
+                      )}
+                    >
+                      <GalleryHorizontal size={18} strokeWidth={2} aria-hidden />
+                      Horizontal
+                      <span className="hidden text-[9px] font-normal opacity-90 sm:inline">Swipe pages</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              {/* Font size */}
-              <div>
-                <p className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Font Size</p>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setFontSize(s => Math.max(14, s - 2) as FontSize)}
-                    className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-brand transition-colors"
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <span className="text-sm font-medium w-8 text-center">{fontSize}px</span>
-                  <button
-                    onClick={() => setFontSize(s => Math.min(22, s + 2) as FontSize)}
-                    className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-brand transition-colors"
-                  >
-                    <Plus size={12} />
-                  </button>
-                  <Type size={14} className="text-muted-foreground ml-1" />
+              <section className={cn(readerSettingsCard(theme), "mt-1 sm:mt-2")} aria-label="Auto-scroll">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "rounded-xl p-2.5",
+                        theme === "dark" ? "bg-cyan-500/15 text-cyan-400" : "bg-cyan-500/10 text-cyan-700"
+                      )}
+                    >
+                      {autoScrollOn ? <Pause size={18} aria-hidden /> : <Play size={18} aria-hidden />}
+                    </div>
+                    <div>
+                      <h3
+                        className={cn(
+                          "text-[11px] font-bold uppercase tracking-wider",
+                          theme === "dark" && "text-gray-400",
+                          theme === "sepia" && "text-amber-800/90",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Auto-scroll
+                      </h3>
+                      <p
+                        className={cn(
+                          "text-xs",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/70",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Steady downward scroll while you read (vertical layout)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full min-w-0 sm:max-w-xs sm:flex-1">
+                    {readingLayout !== "vertical" ? (
+                      <p
+                        className={cn(
+                          "text-xs leading-snug",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/70",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Switch to <span className="font-semibold">Vertical</span> layout above to enable auto-scroll.
+                      </p>
+                    ) : prefersReducedMotion ? (
+                      <p
+                        className={cn(
+                          "text-xs leading-snug",
+                          theme === "dark" && "text-gray-500",
+                          theme === "sepia" && "text-amber-900/70",
+                          theme === "light" && "text-gray-500"
+                        )}
+                      >
+                        Unavailable while <span className="font-semibold">Reduce motion</span> is enabled in your system settings.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        <label className="flex cursor-pointer items-center gap-3 rounded-xl p-2 -m-2 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.04]">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-400 text-brand focus:ring-brand"
+                            checked={autoScrollOn}
+                            onChange={e => setAutoScrollOn(e.target.checked)}
+                          />
+                          <span
+                            className={cn(
+                              "text-sm font-medium",
+                              theme === "dark" && "text-gray-200",
+                              theme === "sepia" && "text-amber-950",
+                              theme === "light" && "text-gray-800"
+                            )}
+                          >
+                            Enable auto-scroll
+                          </span>
+                        </label>
+                        <div>
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
+                            <span
+                              className={cn(
+                                "text-[10px] font-bold uppercase tracking-wider",
+                                theme === "dark" && "text-gray-500",
+                                theme === "sepia" && "text-amber-800/80",
+                                theme === "light" && "text-gray-500"
+                              )}
+                            >
+                              Speed
+                            </span>
+                            <span
+                              className={cn(
+                                "text-xs font-semibold tabular-nums",
+                                theme === "dark" && "text-gray-300",
+                                theme === "sepia" && "text-amber-950",
+                                theme === "light" && "text-gray-800"
+                              )}
+                            >
+                              {autoScrollSpeed}px/s
+                            </span>
+                          </div>
+                          <Slider
+                            min={AUTO_SCROLL_SPEED_MIN}
+                            max={AUTO_SCROLL_SPEED_MAX}
+                            step={2}
+                            value={[autoScrollSpeed]}
+                            onValueChange={([v]) => setAutoScrollSpeed(v as number)}
+                            aria-label="Auto-scroll speed"
+                          />
+                          <div
+                            className={cn(
+                              "mt-1.5 flex justify-between text-[10px]",
+                              theme === "dark" && "text-gray-500",
+                              theme === "sepia" && "text-amber-800/70",
+                              theme === "light" && "text-gray-500"
+                            )}
+                          >
+                            <span>Slower</span>
+                            <span>Faster</span>
+                          </div>
+                        </div>
+                        <p
+                          className={cn(
+                            "text-[11px] leading-snug",
+                            theme === "dark" && "text-gray-500",
+                            theme === "sepia" && "text-amber-900/65",
+                            theme === "light" && "text-gray-500"
+                          )}
+                        >
+                          Wheel, touch-drag, space, arrows, or the page slider pauses auto-scroll. Stops at the end of the book.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              {/* Reading stats */}
-              <div className="ml-auto">
-                <p className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Session</p>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Clock size={12} />
-                  <span id="elapsed-timer">Loading…</span>
-                </div>
-              </div>
+              </section>
             </div>
           </div>
         )}
@@ -604,58 +1946,111 @@ function ReaderContent() {
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
           onClick={() => setShowToc(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reader-toc-title"
         >
           <div
-            className={cn(
-              "absolute left-0 top-0 bottom-0 w-72 shadow-2xl overflow-y-auto",
-              theme === "dark" ? "bg-gray-900" : "bg-white"
-            )}
+            className={cn("absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] shadow-2xl overflow-y-auto", readerTocAside(theme))}
             onClick={e => e.stopPropagation()}
           >
-            <div className={cn("flex items-center justify-between p-4 border-b", theme === "dark" ? "border-gray-700" : "border-gray-100")}>
-              <h3 className="font-semibold" style={{ color: theme === "dark" ? "#f9fafb" : "#111827" }}>Table of Contents</h3>
-              <button onClick={() => setShowToc(false)}>
-                <X size={18} style={{ color: theme === "dark" ? "#9ca3af" : "#6b7280" }} />
+            <div
+              className={cn(
+                "flex items-center justify-between p-4 border-b",
+                theme === "dark" ? "border-gray-700" : theme === "sepia" ? "border-amber-200" : "border-gray-100"
+              )}
+            >
+              <h3
+                id="reader-toc-title"
+                className={cn(
+                  "font-semibold",
+                  theme === "dark" && "text-gray-100",
+                  theme === "sepia" && "text-amber-950",
+                  theme === "light" && "text-gray-900"
+                )}
+              >
+                Table of Contents
+              </h3>
+              <button type="button" onClick={() => setShowToc(false)} aria-label="Close contents">
+                <X
+                  size={18}
+                  className={cn(
+                    theme === "dark" && "text-gray-400",
+                    theme === "sepia" && "text-amber-800",
+                    theme === "light" && "text-gray-500"
+                  )}
+                />
               </button>
             </div>
             <div className="p-4 space-y-1">
-              {[
-                "Chapter 1: The City That Never Sleeps",
-                "Chapter 1 (continued)",
-                "Chapter 1 (scene 3)",
-                "Chapter 2: Roots and Routes",
-                "Chapter 3: The Manuscript",
-              ].map((ch, i) => (
+              {TOC_FROM_PAGES.map(entry => (
                 <button
-                  key={ch}
-                  onClick={() => { goTo(i + 1); setShowToc(false) }}
+                  key={entry.page}
+                  type="button"
+                  onClick={() => {
+                    goTo(entry.page)
+                    setShowToc(false)
+                  }}
                   className={cn(
                     "w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors",
-                    currentPage === i + 1
+                    currentPage === entry.page
                       ? "bg-brand/10 text-brand font-medium"
-                      : theme === "dark" ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-50"
+                      : theme === "dark"
+                        ? "text-gray-300 hover:bg-gray-800"
+                        : theme === "sepia"
+                          ? "text-amber-950 hover:bg-amber-100"
+                          : "text-gray-700 hover:bg-gray-50"
                   )}
                 >
-                  {ch}
+                  <span className="text-[10px] text-muted-foreground block tabular-nums">Page {entry.page}</span>
+                  {entry.label}
                 </button>
               ))}
             </div>
 
             {/* Engagement mini-stats in TOC sidebar */}
             {user && (
-              <div className={cn("mx-4 mb-4 p-3 rounded-xl border", theme === "dark" ? "border-gray-700 bg-gray-800/60" : "border-gray-100 bg-gray-50")}>
-                <p className="text-xs font-semibold mb-2" style={{ color: theme === "dark" ? "#d1d5db" : "#374151" }}>
+              <div
+                className={cn(
+                  "mx-4 mb-4 p-3 rounded-xl border",
+                  theme === "dark" ? "border-gray-700 bg-gray-800/60" : theme === "sepia" ? "border-amber-200 bg-amber-100/50" : "border-gray-100 bg-gray-50"
+                )}
+              >
+                <p
+                  className={cn(
+                    "text-xs font-semibold mb-2",
+                    theme === "dark" && "text-gray-300",
+                    theme === "sepia" && "text-amber-950",
+                    theme === "light" && "text-gray-700"
+                  )}
+                >
                   Your Progress
                 </p>
                 <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs" style={{ color: theme === "dark" ? "#9ca3af" : "#6b7280" }}>
-                    <span>Pages read</span>
-                    <span className="font-semibold">{currentPage} / {TOTAL_PAGES}</span>
+                  <div
+                    className={cn(
+                      "flex justify-between text-xs",
+                      theme === "dark" && "text-gray-400",
+                      theme === "sepia" && "text-amber-900/80",
+                      theme === "light" && "text-gray-500"
+                    )}
+                  >
+                    <span>Sample section</span>
+                    <span className="font-semibold tabular-nums">
+                      {currentPage} / {MOCK_PAGES.length}
+                    </span>
                   </div>
                   <Progress value={(currentPage / TOTAL_PAGES) * 100} className="h-1.5" />
-                  <div className="flex justify-between text-xs" style={{ color: theme === "dark" ? "#9ca3af" : "#6b7280" }}>
-                    <span>Completion</span>
-                    <span className="font-semibold">{((currentPage / TOTAL_PAGES) * 100).toFixed(1)}%</span>
+                  <div
+                    className={cn(
+                      "flex justify-between text-xs",
+                      theme === "dark" && "text-gray-400",
+                      theme === "sepia" && "text-amber-900/80",
+                      theme === "light" && "text-gray-500"
+                    )}
+                  >
+                    <span>Title progress</span>
+                    <span className="font-semibold tabular-nums">{((currentPage / TOTAL_PAGES) * 100).toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
@@ -665,31 +2060,196 @@ function ReaderContent() {
       )}
 
       {/* Reading area — copy/select deterrence only; does not block screenshots or recording */}
-      <main className="flex-1 pt-20 pb-24 px-4">
+      <main
+        className={cn(
+          "flex-1 pb-28 px-4 sm:px-6",
+          prefersReducedMotion ? "transition-none" : "transition-[padding-top] duration-300",
+          showSettings
+            ? "pt-[calc(4.5rem+min(26rem,58vh))] sm:pt-[calc(4.5rem+min(32rem,64vh))]"
+            : "pt-[4.75rem]",
+          readingLayout === "horizontal" && "flex min-h-0 flex-col"
+        )}
+      >
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {readingLayout === "horizontal"
+            ? `Section ${currentPage} of ${MOCK_PAGES.length}. Swipe horizontally or use arrow keys.`
+            : `Scroll to read. Active section ${currentPage} of ${MOCK_PAGES.length}. Arrow keys jump between sections.`}
+        </p>
         <ProtectedSurface
           active={accessState === "allowed"}
           userEmail={user?.email ?? null}
           watermarkVariant={theme === "dark" ? "dark" : "light"}
-          outerClassName="max-w-2xl mx-auto"
-          innerClassName="w-full leading-relaxed"
+          outerClassName={cn(
+            readingLayout === "horizontal"
+              ? "flex min-h-0 w-full max-w-none flex-1 flex-col"
+              : "max-w-2xl mx-auto w-full"
+          )}
+          innerClassName={cn(
+            "w-full leading-relaxed",
+            readingLayout === "horizontal" && "flex min-h-0 flex-1 flex-col"
+          )}
           innerStyle={{
             fontSize: `${fontSize}px`,
-            lineHeight: 1.8,
+            lineHeight: LINE_HEIGHTS[lineHeight],
             color: theme === "dark" ? "#e5e7eb" : theme === "sepia" ? "#44403c" : "#1f2937",
           }}
         >
-          <article className="font-serif">
-            <div className="whitespace-pre-wrap">{pageData.content}</div>
-          </article>
+          {readingLayout === "vertical" ? (
+            <article className={cn(fontFamily === "serif" ? "font-serif" : "font-sans")}>
+              {MOCK_PAGES.map(p => (
+                <section
+                  key={p.page}
+                  id={`reader-section-${p.page}`}
+                  className="mb-14 scroll-mt-28 last:mb-8 sm:scroll-mt-32"
+                >
+                  <div className="whitespace-pre-wrap">{p.content}</div>
+                </section>
+              ))}
+            </article>
+          ) : (
+            <div
+              ref={horizontalScrollRef}
+              className={cn(
+                "flex min-h-0 min-w-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden",
+                !prefersReducedMotion && "scroll-smooth",
+                "overscroll-x-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]",
+                "pb-1"
+              )}
+              aria-label="Paginated sections — swipe left or right"
+            >
+              {MOCK_PAGES.map(p => (
+                <div
+                  key={p.page}
+                  className={cn(
+                    "max-h-[min(72dvh,calc(100dvh-10.5rem))] min-h-0 min-w-full shrink-0 snap-center snap-always",
+                    "overflow-y-auto overscroll-y-contain pr-1"
+                  )}
+                >
+                  <div className="mx-auto max-w-2xl">
+                    <article className={cn(fontFamily === "serif" ? "font-serif" : "font-sans")}>
+                      <div className="whitespace-pre-wrap">{p.content}</div>
+                    </article>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </ProtectedSurface>
       </main>
+
+      {readerHelpOpen ? (
+        <div
+          className="fixed inset-0 z-[65] flex items-end justify-center p-4 pb-24 sm:items-center sm:pb-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reader-help-title"
+        >
+          <button
+            type="button"
+            tabIndex={-1}
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            aria-label="Close shortcuts"
+            onClick={() => setReaderHelpOpen(false)}
+          />
+          <div
+            ref={readerHelpPanelRef}
+            className={cn(
+              "relative z-10 w-full max-w-md rounded-2xl border p-5 shadow-2xl",
+              readerSettingsCard(theme)
+            )}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2
+                id="reader-help-title"
+                className={cn(
+                  "text-base font-semibold",
+                  theme === "dark" && "text-gray-100",
+                  theme === "sepia" && "text-amber-950",
+                  theme === "light" && "text-gray-900"
+                )}
+              >
+                Reader shortcuts
+              </h2>
+              <button
+                ref={readerHelpCloseRef}
+                type="button"
+                onClick={() => setReaderHelpOpen(false)}
+                className={cn(
+                  "rounded-lg p-1.5 transition-colors",
+                  theme === "dark" && "text-gray-400 hover:bg-gray-700 hover:text-white",
+                  theme === "sepia" && "text-amber-800 hover:bg-amber-200/60",
+                  theme === "light" && "text-gray-500 hover:bg-gray-100"
+                )}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <ul
+              className={cn(
+                "space-y-3 text-sm leading-snug",
+                theme === "dark" && "text-gray-300",
+                theme === "sepia" && "text-amber-950",
+                theme === "light" && "text-gray-700"
+              )}
+            >
+              <li className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="inline-flex gap-1 font-mono text-xs">
+                  <kbd className="rounded border border-current/25 bg-black/10 px-1.5 py-0.5 dark:bg-white/10">←</kbd>
+                  <kbd className="rounded border border-current/25 bg-black/10 px-1.5 py-0.5 dark:bg-white/10">→</kbd>
+                </span>
+                <span>Previous / next section</span>
+              </li>
+              <li className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <kbd className="rounded border border-current/25 bg-black/10 px-1.5 py-0.5 font-mono text-xs dark:bg-white/10">?</kbd>
+                <span>Open or close this panel</span>
+              </li>
+              <li className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <kbd className="rounded border border-current/25 bg-black/10 px-1.5 py-0.5 font-mono text-xs dark:bg-white/10">Esc</kbd>
+                <span>
+                  Close overlays in order: shortcuts, then table of contents, then reading settings
+                </span>
+              </li>
+              <li>
+                Bottom bar and table of contents jump between sections; settings hold theme, fonts, layout, and auto-scroll
+                (vertical mode).
+              </li>
+              <li>
+                With <span className="font-medium">auto-scroll</span> on: wheel, touch-drag, space, or arrow keys pause it.
+              </li>
+              <li>
+                If your device uses <span className="font-medium">Reduce motion</span>, page transitions and auto-scroll
+                follow that setting.
+              </li>
+            </ul>
+          </div>
+        </div>
+      ) : null}
+
+      {immersiveMode && !showToolbar && (
+        <button
+          type="button"
+          onClick={() => setShowToolbar(true)}
+          className={cn(
+            "fixed bottom-20 left-1/2 -translate-x-1/2 z-[55] flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium",
+            theme === "dark" && "bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700",
+            theme === "sepia" && "bg-amber-100 border-amber-300 text-amber-950 hover:bg-amber-50",
+            theme === "light" && "bg-white border-gray-200 text-gray-900 hover:bg-gray-50"
+          )}
+        >
+          <PanelTopOpen size={16} aria-hidden />
+          Show controls
+        </button>
+      )}
 
       {/* Bottom nav */}
       <div
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-50 transition-all duration-300",
-          showToolbar ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full",
-          theme === "dark" ? "bg-gray-900/95 border-gray-700" : "bg-white/95 border-gray-200",
+          "fixed bottom-0 left-0 right-0 z-50",
+          prefersReducedMotion ? "transition-none" : "transition-all duration-300",
+          showToolbar ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full pointer-events-none",
+          readerToolbarBar(theme),
           "backdrop-blur-md border-t"
         )}
       >
@@ -699,21 +2259,36 @@ function ReaderContent() {
             size="sm"
             disabled={currentPage <= 1}
             onClick={() => goTo(currentPage - 1)}
-            className="gap-1.5"
+            className={cn(
+              "gap-1.5",
+              theme === "dark" && "text-gray-200 hover:text-white hover:bg-gray-800",
+              theme === "sepia" && "text-amber-950 hover:bg-amber-100"
+            )}
           >
             <ChevronLeft size={16} />
             <span className="hidden sm:inline">Previous</span>
           </Button>
 
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-xs text-muted-foreground font-medium">
-              Page {currentPage} of {MOCK_PAGES.length} (demo)
+          <div className="flex flex-col items-center gap-0.5 min-w-0 max-w-[45vw] sm:max-w-none">
+            <span
+              className={cn(
+                "text-xs font-medium tabular-nums",
+                theme === "dark" && "text-gray-400",
+                theme === "sepia" && "text-amber-900/75",
+                theme === "light" && "text-gray-500"
+              )}
+            >
+              Page {currentPage} of {MOCK_PAGES.length}
+              <span className="hidden sm:inline text-muted-foreground font-normal"> · {progressPct}% of title</span>
             </span>
             <Slider
-              min={1} max={MOCK_PAGES.length} step={1}
+              min={1}
+              max={MOCK_PAGES.length}
+              step={1}
               value={[currentPage]}
               onValueChange={([v]) => goTo(v)}
-              className="w-28"
+              className="w-28 sm:w-36"
+              aria-label="Jump to section"
             />
           </div>
 
@@ -722,7 +2297,11 @@ function ReaderContent() {
             size="sm"
             disabled={currentPage >= MOCK_PAGES.length}
             onClick={() => goTo(currentPage + 1)}
-            className="gap-1.5"
+            className={cn(
+              "gap-1.5",
+              theme === "dark" && "text-gray-200 hover:text-white hover:bg-gray-800",
+              theme === "sepia" && "text-amber-950 hover:bg-amber-100"
+            )}
           >
             <span className="hidden sm:inline">Next</span>
             <ChevronRight size={16} />
@@ -731,35 +2310,29 @@ function ReaderContent() {
       </div>
 
       {/* Elapsed timer (live updating) */}
-      <ElapsedTimer elapsedSecRef={elapsedSecRef} theme={theme} />
+      <ElapsedTimer elapsedSecRef={elapsedSecRef} />
     </div>
   )
 }
 
 // ── Live elapsed timer component ─────────────────────────────────────────────
 
-function ElapsedTimer({
-  elapsedSecRef,
-  theme,
-}: {
-  elapsedSecRef: React.MutableRefObject<number>
-  theme: Theme
-}) {
-  const [display, setDisplay] = React.useState("0:00")
-
+function ElapsedTimer({ elapsedSecRef }: { elapsedSecRef: React.MutableRefObject<number> }) {
   React.useEffect(() => {
     const interval = setInterval(() => {
       const s = elapsedSecRef.current
       const m = Math.floor(s / 60)
       const sec = s % 60
-      setDisplay(`${m}:${String(sec).padStart(2, "0")}`)
-      const el = document.getElementById("elapsed-timer")
-      if (el) el.textContent = `${display} reading`
+      const short = `${m}:${String(sec).padStart(2, "0")}`
+      const text = `${short} reading`
+      document.getElementById("elapsed-timer")?.replaceChildren(document.createTextNode(text))
+      document.querySelector("[data-elapsed-session]")?.replaceChildren(document.createTextNode(text))
+      document.getElementById("elapsed-toolbar")?.replaceChildren(document.createTextNode(short))
     }, 1000)
     return () => clearInterval(interval)
-  }, [display, elapsedSecRef])
+  }, [elapsedSecRef])
 
-  return null // purely updates DOM element
+  return null
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
