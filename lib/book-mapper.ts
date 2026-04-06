@@ -6,6 +6,8 @@ export type ApiBookRecord = {
   id: string | number
   title: string
   author: string
+  /** Optional opening lines for the book detail page (camelCase API). */
+  sampleExcerpt?: string | null
   coverUrl?: string | null
   rating?: number | null
   reviewCount?: number | null

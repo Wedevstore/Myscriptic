@@ -131,6 +131,7 @@ Route::get('/library/{book}/asset/{uid}', [LibraryController::class, 'downloadAs
 
 Route::middleware(['auth:sanctum', 'not.blocked'])->group(function () {
     Route::post('/books', [BookController::class, 'store']);
+    Route::patch('/books/{book}', [BookController::class, 'update']);
     Route::get('/author/my-books', [BookController::class, 'mine']);
     Route::delete('/books/{book}', [BookController::class, 'destroy']);
     Route::post('/upload/signed-url', [UploadController::class, 'signedUrl']);

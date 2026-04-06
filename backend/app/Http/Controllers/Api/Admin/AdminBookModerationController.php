@@ -80,6 +80,7 @@ class AdminBookModerationController extends Controller
             'author' => $authorName,
             'authorId' => (string) $book->author_id,
             'description' => $book->description,
+            'sampleExcerpt' => $book->sample_excerpt,
             'category' => $book->category,
             'tags' => $book->tags ?? [],
             'coverUrl' => $book->cover_url,

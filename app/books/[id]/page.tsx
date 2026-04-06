@@ -15,6 +15,7 @@ import { MOCK_BOOKS } from "@/lib/mock-data"
 import { booksApi, wishlistApi } from "@/lib/api"
 import { syncWishlistWithServer } from "@/lib/wishlist-sync"
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
+import { resolveBookSampleExcerpt } from "@/lib/book-sample-excerpts"
 import type { BookCardData } from "@/components/books/book-card"
 import { apiUrlConfigured, laravelAuthEnabled, laravelPhase2Enabled } from "@/lib/auth-mode"
 import { addBookToCart, refreshBookInCart } from "@/lib/cart-actions"
@@ -26,6 +27,7 @@ import {
   AlertCircle, Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ProtectedSurface } from "@/components/protected-surface"
 
 // Mock reviews
 const MOCK_REVIEWS = [
@@ -109,16 +111,19 @@ function BookDetailContent() {
 
   const [remote, setRemote] = React.useState<BookCardData | null>(null)
   const [remoteDesc, setRemoteDesc] = React.useState<string | null>(null)
+  const [remoteSample, setRemoteSample] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     const id = params?.id
     if (!id) return
+    setRemoteSample(null)
     booksApi
       .get(id)
       .then(res => {
         const d = res.data as ApiBookRecord & { description?: string | null }
         setRemote(apiBookToCard(d))
         setRemoteDesc(d.description ?? null)
+        setRemoteSample(d.sampleExcerpt ?? null)
       })
       .catch(() => {})
   }, [params?.id])
@@ -126,6 +131,7 @@ function BookDetailContent() {
   const book = remote ?? MOCK_BOOKS.find(b => b.id === params.id) ?? MOCK_BOOKS[0]
   const extras = BOOK_EXTRAS[book.id] ?? BOOK_EXTRAS["bk_001"]
   const descriptionText = (remoteDesc ?? extras.description).trim()
+  const openingExcerpt = resolveBookSampleExcerpt(book.id, remoteSample)
 
   const [wishlisted, setWishlisted] = React.useState(false)
   const [wishBusy,   setWishBusy]   = React.useState(false)
@@ -381,8 +387,27 @@ function BookDetailContent() {
             <span className="text-sm text-muted-foreground">· {extras.completionRate}% completion rate</span>
           </div>
 
-          {/* Description */}
+          {/* Marketing copy — shareable; not a substitute for protecting body text */}
           <p className="text-muted-foreground leading-relaxed text-[15px]">{descriptionText}</p>
+
+          {openingExcerpt ? (
+            <section className="mt-6" aria-labelledby="opening-excerpt-heading">
+              <h2
+                id="opening-excerpt-heading"
+                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3"
+              >
+                Opening excerpt
+              </h2>
+              <ProtectedSurface
+                userEmail={user?.email ?? null}
+                outerClassName="block rounded-xl border border-border bg-muted/25 p-4 sm:p-5"
+              >
+                <p className="text-[15px] sm:text-base leading-relaxed text-foreground font-serif whitespace-pre-wrap m-0">
+                  {openingExcerpt}
+                </p>
+              </ProtectedSurface>
+            </section>
+          ) : null}
 
           {/* Meta */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">

@@ -12,6 +12,7 @@ class Book extends Model
         'author_id',
         'title',
         'description',
+        'sample_excerpt',
         'category',
         'tags',
         'cover_url',

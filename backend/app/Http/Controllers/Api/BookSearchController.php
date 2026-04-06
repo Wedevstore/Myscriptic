@@ -53,6 +53,7 @@ class BookSearchController extends Controller
             'author' => $authorName,
             'authorId' => (string) $book->author_id,
             'description' => $book->description,
+            'sampleExcerpt' => $book->sample_excerpt,
             'category' => $book->category,
             'tags' => $book->tags ?? [],
             'coverUrl' => AssetCdn::transformUrl($book->cover_url),

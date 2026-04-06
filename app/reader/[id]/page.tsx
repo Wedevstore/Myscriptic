@@ -33,6 +33,7 @@ import {
   Lock, ShoppingCart, Crown, CheckCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ProtectedSurface } from "@/components/protected-surface"
 
 // ── Book content (mock pages — in prod fetched from CDN per chapter) ───────────
 const MOCK_PAGES = [
@@ -663,20 +664,24 @@ function ReaderContent() {
         </div>
       )}
 
-      {/* Reading area */}
+      {/* Reading area — copy/select deterrence only; does not block screenshots or recording */}
       <main className="flex-1 pt-20 pb-24 px-4">
-        <article
-          className="max-w-2xl mx-auto leading-relaxed"
-          style={{
+        <ProtectedSurface
+          active={accessState === "allowed"}
+          userEmail={user?.email ?? null}
+          watermarkVariant={theme === "dark" ? "dark" : "light"}
+          outerClassName="max-w-2xl mx-auto"
+          innerClassName="w-full leading-relaxed"
+          innerStyle={{
             fontSize: `${fontSize}px`,
             lineHeight: 1.8,
             color: theme === "dark" ? "#e5e7eb" : theme === "sepia" ? "#44403c" : "#1f2937",
           }}
         >
-          <div className="whitespace-pre-wrap font-serif">
-            {pageData.content}
-          </div>
-        </article>
+          <article className="font-serif">
+            <div className="whitespace-pre-wrap">{pageData.content}</div>
+          </article>
+        </ProtectedSurface>
       </main>
 
       {/* Bottom nav */}

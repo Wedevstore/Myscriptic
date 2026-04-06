@@ -17,6 +17,9 @@ import {
   Info, Loader2, Globe, Lock, CreditCard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { booksApi } from "@/lib/api"
+import { apiUrlConfigured, laravelAuthEnabled } from "@/lib/auth-mode"
+import { demoPic } from "@/lib/demo-images"
 
 type AccessType = "FREE" | "PAID" | "SUBSCRIPTION"
 type BookFormat  = "ebook" | "audiobook" | "magazine"
@@ -24,6 +27,8 @@ type BookFormat  = "ebook" | "audiobook" | "magazine"
 interface BookFormState {
   title: string
   description: string
+  /** Shown on book detail inside copy-protected “Opening excerpt” (optional). */
+  sampleExcerpt: string
   category: string
   tags: string[]
   tagInput: string
@@ -98,9 +103,10 @@ function BookUploadForm() {
   const router = useRouter()
   const [submitting, setSubmitting] = React.useState(false)
   const [submitted, setSubmitted] = React.useState(false)
+  const [submitError, setSubmitError] = React.useState<string | null>(null)
 
   const [form, setForm] = React.useState<BookFormState>({
-    title: "", description: "", category: "", tags: [], tagInput: "",
+    title: "", description: "", sampleExcerpt: "", category: "", tags: [], tagInput: "",
     format: "ebook", accessType: "SUBSCRIPTION",
     price: "", currency: "USD",
     coverFile: null, coverPreview: null, bookFile: null, audioFile: null,
@@ -133,10 +139,43 @@ function BookUploadForm() {
     e.preventDefault()
     if (!form.title || !form.description || !form.category) return
     setSubmitting(true)
-    // TODO: REAL_API → POST /api/books (multipart/form-data) with S3 upload
-    // 1. Get signed S3 URL from  POST /api/upload/signed-url
-    // 2. Upload files directly to S3
-    // 3. POST /api/books with S3 URLs and metadata
+    setSubmitError(null)
+
+    const useApi = apiUrlConfigured() && laravelAuthEnabled()
+    if (useApi) {
+      try {
+        if (form.accessType === "PAID") {
+          const p = parseFloat(form.price)
+          if (!Number.isFinite(p) || p < 0.99) {
+            setSubmitError("Set a valid price (minimum 0.99) for paid books.")
+            setSubmitting(false)
+            return
+          }
+        }
+        const payload: Record<string, unknown> = {
+          title: form.title.trim(),
+          description: form.description.trim(),
+          sample_excerpt: form.sampleExcerpt.trim() || null,
+          category: form.category,
+          tags: form.tags,
+          access_type: form.accessType,
+          format: form.format,
+          currency: form.currency,
+          cover_url: demoPic(`author-new-${Date.now()}-${form.title.slice(0, 24)}`, 480, 720),
+        }
+        if (form.accessType === "PAID") {
+          payload.price = parseFloat(form.price)
+        }
+        await booksApi.createJson(payload)
+        setSubmitting(false)
+        setSubmitted(true)
+      } catch (err) {
+        setSubmitting(false)
+        setSubmitError(err instanceof Error ? err.message : "Could not submit book. Try again.")
+      }
+      return
+    }
+
     await new Promise(r => setTimeout(r, 1800))
     setSubmitting(false)
     setSubmitted(true)
@@ -158,7 +197,20 @@ function BookUploadForm() {
               Back to Dashboard
             </Button>
           </Link>
-          <Button variant="outline" onClick={() => { setSubmitted(false); setForm(f => ({ ...f, title: "", description: "" })) }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSubmitted(false)
+              setForm(f => ({
+                ...f,
+                title: "",
+                description: "",
+                sampleExcerpt: "",
+                tags: [],
+                tagInput: "",
+              }))
+            }}
+          >
             Upload Another
           </Button>
         </div>
@@ -187,6 +239,21 @@ function BookUploadForm() {
         </AlertDescription>
       </Alert>
 
+      {apiUrlConfigured() && laravelAuthEnabled() && (
+        <Alert className="mb-6 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40">
+          <Info size={15} className="text-amber-700 dark:text-amber-400" />
+          <AlertDescription className="text-sm text-foreground">
+            Live API mode: submission uses a placeholder cover URL until S3 file upload is wired. Opening excerpt is optional and appears on the public book page in a copy-protected block.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {submitError && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>{submitError}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-6">
         {/* Basic info */}
         <section className="bg-card border border-border rounded-xl p-6 space-y-5">
@@ -211,6 +278,19 @@ function BookUploadForm() {
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
             />
             <p className="text-xs text-muted-foreground text-right">{form.description.length}/2000</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sample-excerpt">Opening excerpt <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <textarea
+              id="sample-excerpt"
+              value={form.sampleExcerpt}
+              onChange={e => set("sampleExcerpt", e.target.value.slice(0, 8000))}
+              placeholder="A short teaser (first scene or chapter opening). Shown on the book page in a protected preview — separate from the marketing description above."
+              rows={6}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+            />
+            <p className="text-xs text-muted-foreground text-right">{form.sampleExcerpt.length}/8000</p>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">

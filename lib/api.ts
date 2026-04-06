@@ -190,11 +190,22 @@ export const booksApi = {
   },
   categories: () => request<{ data: string[] }>("/books/categories"),
   get:    (id: string) => request<{ data: unknown }>(`/books/${id}`),
+  /** JSON metadata + URLs/keys (no multipart). */
+  createJson: (body: Record<string, unknown>) =>
+    request<{ data: unknown }>("/books", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   create: (formData: FormData) =>
     request<{ data: unknown }>("/books", {
       method: "POST",
       body: formData,
       headers: {} as Record<string, string>, // let browser set multipart boundary
+    }),
+  patch: (id: string, body: Record<string, unknown>) =>
+    request<{ data: unknown }>(`/books/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
     }),
   update: (id: string, formData: FormData) =>
     request<{ data: unknown }>(`/books/${id}`, { method: "POST", body: formData }),

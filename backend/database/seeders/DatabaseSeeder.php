@@ -92,10 +92,21 @@ class DatabaseSeeder extends Seeder
 
         PlatformSetting::set('subscription_pool_commission_pct', '30');
 
+        $lagosOpening = <<<'TEXT'
+Chapter 1: The City That Never Sleeps
+
+The Lagos sun had already begun its lazy descent by the time Adaeze Okonkwo stepped out of the yellow danfo and onto the cracked pavement of Victoria Island. Her leather satchel — a gift from her mother, worn smooth at the straps — hung heavy across her shoulder, stuffed with the manuscripts she had been editing all afternoon.
+
+She paused at the intersection, watching the traffic policeman in his faded white uniform perform his daily ballet, arms slicing the air in gestures that only the most seasoned Lagos drivers could interpret.
+
+Lagos. It never ceased to amaze her.
+TEXT;
+
         $samples = [
             [
                 'title' => 'The Lagos Chronicles',
                 'description' => 'A literary journey through contemporary Lagos — family, ambition, and the pulse of the city.',
+                'sample_excerpt' => $lagosOpening,
                 'category' => 'Fiction',
                 'tags' => ['africa', 'literary'],
                 'cover_url' => self::pic('core-bk-lagos'),
@@ -108,6 +119,7 @@ class DatabaseSeeder extends Seeder
             [
                 'title' => 'Atomic Habits: African Edition',
                 'description' => 'Build better habits with examples grounded in everyday life across the continent.',
+                'sample_excerpt' => "You do not rise to the level of your goals. You fall to the level of your systems.\n\nThis edition opens with market women in Ibadan who rebuilt their savings habits one tiny stack of receipts at a time — no drama, no apps, just repetition until the behaviour felt inevitable.",
                 'category' => 'Self-Help',
                 'tags' => ['habits', 'productivity'],
                 'cover_url' => self::pic('core-bk-atomic'),

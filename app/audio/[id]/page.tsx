@@ -17,6 +17,7 @@ import {
   List, ChevronDown, ChevronUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ProtectedSurface } from "@/components/protected-surface"
 
 // Mock chapters
 const CHAPTERS = [
@@ -42,7 +43,7 @@ type PlayerBookMeta = { id: string; title: string; author: string; coverUrl: str
 function AudioPlayerContent() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, user } = useAuth()
   const useApi = apiUrlConfigured()
   const routeId = typeof params?.id === "string" ? params.id : ""
 
@@ -190,6 +191,12 @@ function AudioPlayerContent() {
         <div className="w-16" />
       </header>
 
+      <ProtectedSurface
+        userEmail={user?.email ?? null}
+        watermarkVariant="dark"
+        outerClassName="flex flex-col flex-1 min-h-0"
+        innerClassName="flex flex-col flex-1 min-h-0"
+      >
       {/* Main Player */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 max-w-lg mx-auto w-full gap-8">
         {/* Cover art */}
@@ -353,6 +360,7 @@ function AudioPlayerContent() {
           </div>
         </div>
       )}
+      </ProtectedSurface>
     </div>
   )
 }

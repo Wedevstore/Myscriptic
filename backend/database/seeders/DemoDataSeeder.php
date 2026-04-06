@@ -106,11 +106,13 @@ class DemoDataSeeder extends Seeder
         ];
 
         $paidBook = null;
+        $firstPaidExcerpt = "The market woke before the sun. Mama Nkechi tied her gele with practiced hands, already hearing the distant rumble of okadas along the main road.\n\nShe counted the crates of dried fish twice — habit, not hope. Today had to go well; the children’s fees were due before the week ran out.";
         foreach ($demoBooks as $i => $row) {
             $book = Book::query()->create([
                 'author_id' => $demoAuthor->id,
                 'title' => $row['title'],
                 'description' => 'Demo description for '.$row['title'].'. Replace with real copy in production.',
+                'sample_excerpt' => ($i === 0 && $row['format'] === 'ebook') ? $firstPaidExcerpt : null,
                 'category' => $row['category'],
                 'tags' => ['demo', strtolower($row['category'])],
                 'cover_url' => self::pic(240, 360, $row['seed']),

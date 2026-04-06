@@ -82,6 +82,7 @@ class BookController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'sample_excerpt' => ['nullable', 'string', 'max:65535'],
             'category' => ['nullable', 'string', 'max:120'],
             'tags' => ['nullable', 'array'],
             'tags.*' => ['string', 'max:64'],
@@ -165,6 +166,33 @@ class BookController extends Controller
         ]);
     }
 
+    public function update(Request $request, Book $book): JsonResponse
+    {
+        $user = $request->user();
+        if (! in_array($user->role, ['author', 'admin'], true)) {
+            abort(403, 'Only authors can update books.');
+        }
+        if ($book->author_id !== $user->id && $user->role !== 'admin') {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'title' => ['sometimes', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string'],
+            'sample_excerpt' => ['sometimes', 'nullable', 'string', 'max:65535'],
+            'category' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'tags' => ['sometimes', 'nullable', 'array'],
+            'tags.*' => ['string', 'max:64'],
+            'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'currency' => ['sometimes', 'nullable', 'string', 'max:8'],
+        ]);
+
+        $book->update($data);
+        $book->load('author:id,name');
+
+        return response()->json(['data' => $this->bookPayload($book)]);
+    }
+
     public function destroy(Request $request, Book $book): JsonResponse
     {
         $user = $request->user();
@@ -192,6 +220,7 @@ class BookController extends Controller
             'author' => $authorName,
             'authorId' => (string) $book->author_id,
             'description' => $book->description,
+            'sampleExcerpt' => $book->sample_excerpt,
             'category' => $book->category,
             'tags' => $book->tags ?? [],
             'coverUrl' => AssetCdn::transformUrl($book->cover_url),
