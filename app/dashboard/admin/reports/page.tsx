@@ -138,12 +138,13 @@ function triggerReportsCsvDownload(lines: string[], basename: string) {
   URL.revokeObjectURL(a.href)
 }
 
-/** Browser snapshot of the payout table (respects search / status filters). */
-function exportReportsPayoutsClient(rows: PayoutRow[], live: boolean) {
+/** Browser snapshot of the payout table (respects search / status filters), or a single row when `fileTag` is set. */
+function exportReportsPayoutsClient(rows: PayoutRow[], live: boolean, fileTag?: string) {
   const header = ["id", "author", "email", "weight_or_reads", "pool_or_engagement_pct", "gross", "commission", "net", "status"]
+  const single = rows.length === 1
   const lines = [
     live ? "# source: API (visible rows only; server export may include full list)" : "# source: local demo store",
-    "# note: search and status filters applied in browser",
+    ...(single ? ["# note: single payout row"] : ["# note: search and status filters applied in browser"]),
     header.join(","),
     ...rows.map(r =>
       [
@@ -162,7 +163,10 @@ function exportReportsPayoutsClient(rows: PayoutRow[], live: boolean) {
     ),
   ]
   const d = new Date().toISOString().slice(0, 10)
-  triggerReportsCsvDownload(lines, `reports-payouts-${live ? "api-visible" : "demo"}-${d}.csv`)
+  const mid =
+    fileTag?.replace(/[^\w.-]+/g, "_").slice(0, 80) ??
+    (live ? "api-visible" : "demo")
+  triggerReportsCsvDownload(lines, `reports-payouts-${mid}-${d}.csv`)
 }
 
 function exportReportsAuditClient(rows: AuditRow[], live: boolean) {
@@ -598,7 +602,12 @@ function AdminReportsContent() {
                               <CheckCircle size={11} /> Release
                             </button>
                           )}
-                          <button type="button" className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" aria-label="Download report">
+                          <button
+                            type="button"
+                            className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                            aria-label="Download this payout row as CSV"
+                            onClick={() => exportReportsPayoutsClient([r], live, `row-${r.id}`)}
+                          >
                             <Download size={12} />
                           </button>
                         </div>

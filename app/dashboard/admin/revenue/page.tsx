@@ -683,7 +683,7 @@ function RevenueContent() {
                     className="w-full gap-2"
                     onClick={exportPayoutsCSV}
                   >
-                    <Download size={14} /> Export Audit Log (CSV)
+                    <Download size={14} /> Export payouts (CSV)
                   </Button>
                 </div>
               </div>
