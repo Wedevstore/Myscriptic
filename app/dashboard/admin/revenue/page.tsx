@@ -412,10 +412,10 @@ function RevenueContent() {
       const cycle = cycles.find(c => c.id === p.cycleId)
       return `"${p.authorName}",${p.totalEngagement},${p.sharePct.toFixed(2)},$${p.grossEarnings.toFixed(2)},-$${p.platformFee.toFixed(2)},$${p.netEarnings.toFixed(2)},${p.status},"${cycle?.cycleStart ?? p.cycleId}"`
     })
-    const csv = [header, ...rows].join("\n")
+    const csv = ["# source: local demo store", header, ...rows].join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
     const url  = URL.createObjectURL(blob)
-    const a    = document.createElement("a"); a.href = url; a.download = "myscriptic-payouts.csv"; a.click()
+    const a    = document.createElement("a"); a.href = url; a.download = `payouts-demo-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
 

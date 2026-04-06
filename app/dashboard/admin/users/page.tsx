@@ -208,11 +208,16 @@ export default function AdminUsersPage() {
     const rows = filtered
     const header = ["id", "name", "email", "role", "status", "joined", "last_login", "ip"]
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
-    const lines = [header.join(","), ...rows.map(u => [u.id, u.name, u.email, u.role, u.status, u.joined, u.lastLogin, u.ip].map(esc).join(","))]
+    const lines = [
+      live ? "# source: API" : "# source: local demo store",
+      ...(live ? [`# api_page: ${page} of ${lastPage} (search/filter applied in browser)`] : []),
+      header.join(","),
+      ...rows.map(u => [u.id, u.name, u.email, u.role, u.status, u.joined, u.lastLogin, u.ip].map(esc).join(",")),
+    ]
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
     const a = document.createElement("a")
     a.href = URL.createObjectURL(blob)
-    a.download = "users-export.csv"
+    a.download = `users-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
   }

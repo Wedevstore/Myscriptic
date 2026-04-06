@@ -164,6 +164,12 @@ function BooksContent() {
     const head = ["id", "title", "author", "author_email", "format", "access", "category", "status"]
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
     const lines = [
+      live ? "# source: API" : "# source: local demo store",
+      ...(live
+        ? [
+            `# catalog_page: ${listPage} of ${listMeta.last_page}; pending moderation rows merged; search/filter in browser`,
+          ]
+        : []),
       head.join(","),
       ...rows.map(r =>
         [r.id, r.title, r.author, r.authorEmail, r.format, r.accessType, r.category, r.approvalStatus]
@@ -175,7 +181,7 @@ function BooksContent() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `myscriptic-books-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `books-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

@@ -206,10 +206,12 @@ function OrderRow({ order, onRefund }: { order: Order; onRefund: (id: string) =>
   )
 }
 
-function exportOrdersCsv(rows: Order[]) {
+function exportOrdersCsv(rows: Order[], live: boolean, page: number, lastPage: number) {
   const header = ["order_number", "created_at", "user_id", "status", "gateway", "currency", "total"]
   const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
   const lines = [
+    live ? "# source: API" : "# source: local demo store",
+    ...(live ? [`# api_page: ${page} of ${lastPage} (search/filter applied in browser)`] : []),
     header.join(","),
     ...rows.map(o =>
       [o.orderNumber, o.createdAt, o.userId, o.status, o.paymentGateway, o.currency, String(o.total)].map(esc).join(",")
@@ -218,7 +220,7 @@ function exportOrdersCsv(rows: Order[]) {
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
   const a = document.createElement("a")
   a.href = URL.createObjectURL(blob)
-  a.download = "orders-export.csv"
+  a.download = `orders-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(a.href)
 }
@@ -404,7 +406,7 @@ function AdminOrdersContent() {
             Next
           </Button>
         )}
-        <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => exportOrdersCsv(filtered)}>
+        <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => exportOrdersCsv(filtered, live, page, lastPage)}>
           <Download size={14} /> Export CSV
         </Button>
       </div>

@@ -222,6 +222,10 @@ export default function AdminAuthorsPage() {
     const header = ["id", "name", "email", "status", "books", "read_minutes", "earnings_usd", "joined"]
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
     const lines = [
+      live ? "# source: API" : "# source: local demo store",
+      ...(live
+        ? [`# api_page: ${page} of ${lastPage}; pending applications merged on first rows; filter applied in browser`]
+        : []),
       header.join(","),
       ...filtered.map(a =>
         [a.id, a.name, a.email, a.status, String(a.books), String(a.totalReads), String(a.totalEarned), a.joinedAt]
@@ -232,7 +236,7 @@ export default function AdminAuthorsPage() {
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
     const el = document.createElement("a")
     el.href = URL.createObjectURL(blob)
-    el.download = "authors-export.csv"
+    el.download = `authors-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
     el.click()
     URL.revokeObjectURL(el.href)
   }

@@ -170,10 +170,12 @@ function TxnRow({ txn, live }: { txn: Transaction; live: boolean }) {
   )
 }
 
-function exportTxnCsv(rows: Transaction[]) {
+function exportTxnCsv(rows: Transaction[], live: boolean, page: number, lastPage: number) {
   const header = ["id", "created_at", "gateway", "amount", "currency", "status", "reference_id", "order_id", "user_id"]
   const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
   const lines = [
+    live ? "# source: API" : "# source: local demo store",
+    ...(live ? [`# api_page: ${page} of ${lastPage} (search/filter applied in browser)`] : []),
     header.join(","),
     ...rows.map(t =>
       [t.id, t.createdAt, t.gateway, String(t.amount), t.currency, t.status, t.referenceId, t.orderId, t.userId]
@@ -184,7 +186,7 @@ function exportTxnCsv(rows: Transaction[]) {
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
   const a = document.createElement("a")
   a.href = URL.createObjectURL(blob)
-  a.download = "transactions-export.csv"
+  a.download = `transactions-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(a.href)
 }
@@ -353,7 +355,7 @@ function TransactionsContent() {
           <Filter size={13} />
           {filtered.length} of {txns.length}
         </div>
-        <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => exportTxnCsv(filtered)}>
+        <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => exportTxnCsv(filtered, live, page, lastPage)}>
           <Download size={14} /> Export CSV
         </Button>
       </div>

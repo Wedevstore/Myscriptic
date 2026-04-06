@@ -416,6 +416,8 @@ function RefundsContent() {
     const header = ["id", "order_number", "customer", "amount", "currency", "gateway", "status", "created_at"]
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
     const lines = [
+      live ? "# source: API" : "# source: local demo store",
+      ...(live ? ["# note: full list from API in one response; search/filter applied in browser"] : []),
       header.join(","),
       ...filtered.map(r =>
         [
@@ -435,7 +437,7 @@ function RefundsContent() {
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
     const a = document.createElement("a")
     a.href = URL.createObjectURL(blob)
-    a.download = "refunds-export.csv"
+    a.download = `refunds-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
   }

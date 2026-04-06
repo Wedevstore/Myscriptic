@@ -61,10 +61,12 @@ function mapPlatformActivity(row: Record<string, unknown>): ActivityLog {
   }
 }
 
-function exportActivityCsv(rows: ActivityLog[]) {
+function exportActivityCsv(rows: ActivityLog[], live: boolean, page: number, lastPage: number) {
   const header = ["created_at", "user", "user_id", "action", "category"]
   const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
   const lines = [
+    live ? "# source: API" : "# source: local demo store",
+    ...(live ? [`# api_page: ${page} of ${lastPage} (search/filter applied in browser)`] : []),
     header.join(","),
     ...rows.map(r =>
       [r.createdAt, r.userName, r.userId, r.action, r.category].map(esc).join(",")
@@ -73,7 +75,7 @@ function exportActivityCsv(rows: ActivityLog[]) {
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
   const a = document.createElement("a")
   a.href = URL.createObjectURL(blob)
-  a.download = "platform-activity.csv"
+  a.download = `platform-activity-${live ? "api" : "demo"}-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(a.href)
 }
@@ -148,7 +150,7 @@ export default function AdminActivityPage() {
             <RefreshCw size={12} className={cn((refreshing || loading) && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={() => exportActivityCsv(filtered)}>
+          <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={() => exportActivityCsv(filtered, live, page, lastPage)}>
             <Download size={12} />
             Export
           </Button>
