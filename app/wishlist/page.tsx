@@ -74,6 +74,11 @@ function WishlistContent() {
       return
     }
 
+    if (!apiUrlConfigured()) {
+      setResolvedBooks(fromMock)
+      return
+    }
+
     let cancelled = false
     Promise.all(
       wishlistIds.map(id =>

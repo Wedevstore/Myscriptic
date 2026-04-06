@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { MOCK_BOOKS, CATEGORIES, resolveMockAuthorId } from "@/lib/mock-data"
 import { authorsApi, booksApi } from "@/lib/api"
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
+import { apiUrlConfigured } from "@/lib/auth-mode"
 import {
   Search, SlidersHorizontal, X, ChevronDown, BookOpen,
   Headphones, Grid3X3, List,
@@ -94,6 +95,10 @@ function BooksContent() {
       setAuthorFilterName(null)
       return
     }
+    if (!apiUrlConfigured()) {
+      setAuthorFilterName(null)
+      return
+    }
     authorsApi
       .get(numericAuthorId)
       .then(res => setAuthorFilterName(res.data?.name ?? null))
@@ -104,6 +109,15 @@ function BooksContent() {
     let alive = true
     if (!clientOnlyMockAuthor) setLoading(true)
     else setLoading(false)
+
+    if (!apiUrlConfigured()) {
+      setApiBooks(null)
+      setApiCats([])
+      setLoading(false)
+      return () => {
+        alive = false
+      }
+    }
 
     const listParams: Record<string, string> = { per_page: "72" }
     if (numericAuthorId) listParams.author_id = numericAuthorId
@@ -138,11 +152,17 @@ function BooksContent() {
       setSearchHits(null)
       return
     }
+    if (!apiUrlConfigured()) {
+      setSearchHits(null)
+      return
+    }
     const t = window.setTimeout(() => {
       booksApi
         .search(q, 60, 1)
         .then(res => {
-          setSearchHits((res.data as ApiBookRecord[]).map(apiBookToCard))
+          const raw = res?.data
+          const list = Array.isArray(raw) ? raw : []
+          setSearchHits(list.map(row => apiBookToCard(row as ApiBookRecord)))
         })
         .catch(() => setSearchHits(null))
     }, 320)
