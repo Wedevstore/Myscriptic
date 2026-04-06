@@ -222,6 +222,24 @@ function RefundRow({
         </td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex gap-1.5 items-center">
+            {req.orderId ? (
+              <Link
+                href={`/invoice/${req.orderId}`}
+                className="p-1.5 rounded-md bg-muted hover:bg-muted-foreground/20 text-muted-foreground transition-colors inline-flex shrink-0"
+                aria-label="Open invoice"
+                title="Open invoice"
+              >
+                <Eye size={13} />
+              </Link>
+            ) : (
+              <span
+                className="p-1.5 rounded-md bg-muted/50 text-muted-foreground/40 inline-flex shrink-0 cursor-not-allowed"
+                title="No order id"
+                aria-hidden
+              >
+                <Eye size={13} />
+              </span>
+            )}
             {!readOnly && req.status === "pending" && (
               <>
                 <button

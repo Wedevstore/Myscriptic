@@ -123,13 +123,24 @@ function OrderRow({ order, onRefund }: { order: Order; onRefund: (id: string) =>
         </td>
         <td className="px-4 py-3">
           <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
-            <button
-              type="button"
-              className="p-1.5 rounded-md bg-muted hover:bg-muted-foreground/20 text-muted-foreground transition-colors"
-              aria-label="View order"
-            >
-              <Eye size={13} />
-            </button>
+            {order.id ? (
+              <Link
+                href={`/invoice/${order.id}`}
+                className="p-1.5 rounded-md bg-muted hover:bg-muted-foreground/20 text-muted-foreground transition-colors inline-flex"
+                aria-label="Open invoice"
+                title="Open invoice"
+              >
+                <Eye size={13} />
+              </Link>
+            ) : (
+              <span
+                className="p-1.5 rounded-md bg-muted/50 text-muted-foreground/40 inline-flex cursor-not-allowed"
+                title="No order id"
+                aria-hidden
+              >
+                <Eye size={13} />
+              </span>
+            )}
             {order.status === "paid" && (
               <button
                 type="button"
