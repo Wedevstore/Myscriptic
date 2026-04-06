@@ -464,10 +464,12 @@ export function VideoEmbedFrame({
   ])
 
   if (!parsed) {
+    const trimmed = url.trim()
+    const openable = /^https?:\/\//i.test(trimmed)
     return (
       <div
         className={cn(
-          "flex flex-col items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5",
+          "flex flex-col items-center justify-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5",
           "aspect-video text-center p-6"
         )}
       >
@@ -475,6 +477,16 @@ export function VideoEmbedFrame({
         <p className="text-sm text-muted-foreground max-w-sm">
           This lesson URL is not a supported YouTube or Vimeo link. Edit the course and paste a valid watch URL.
         </p>
+        {openable ? (
+          <a
+            href={trimmed}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium text-brand hover:underline"
+          >
+            Open link in new tab
+          </a>
+        ) : null}
       </div>
     )
   }

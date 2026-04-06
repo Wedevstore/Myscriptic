@@ -17,7 +17,7 @@ import { coursesPublicApi } from "@/lib/api"
 import { mapAuthorCourseDetailFromApi } from "@/lib/courses-from-api"
 import { isAllowedVideoUrl } from "@/lib/video-embed"
 import {
-  GraduationCap, ChevronLeft, ListVideo, Eye, Lock, ExternalLink, CreditCard,
+  GraduationCap, ChevronLeft, ListVideo, Eye, Lock, CreditCard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCourseAccessLabel } from "@/lib/course-access"
@@ -276,36 +276,24 @@ function CourseSlugInner() {
                       </div>
                     </div>
                   ) : (
-                    <>
-                      <VideoEmbedFrame
-                        url={lesson.videoUrl}
-                        title={lesson.title}
-                        {...(lessons.length > 1
-                          ? {
-                              onPreviousLesson: () => setActiveIdx(i => Math.max(0, i - 1)),
-                              onNextLesson: () => setActiveIdx(i => Math.min(lessons.length - 1, i + 1)),
-                              hasPreviousLesson: activeIdx > 0,
-                              hasNextLesson: activeIdx < lessons.length - 1,
-                              showLessonsButton: true,
-                              onOpenLessons: () =>
-                                document.getElementById("course-lesson-panel")?.scrollIntoView({
-                                  behavior: "smooth",
-                                  block: "nearest",
-                                }),
-                            }
-                          : {})}
-                      />
-                      {!invalidLesson && (
-                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                          <ExternalLink size={10} />
-                          Having trouble? Open the original link in{" "}
-                          <a href={lesson.videoUrl} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
-                            a new tab
-                          </a>
-                          .
-                        </p>
-                      )}
-                    </>
+                    <VideoEmbedFrame
+                      url={lesson.videoUrl}
+                      title={lesson.title}
+                      {...(lessons.length > 1
+                        ? {
+                            onPreviousLesson: () => setActiveIdx(i => Math.max(0, i - 1)),
+                            onNextLesson: () => setActiveIdx(i => Math.min(lessons.length - 1, i + 1)),
+                            hasPreviousLesson: activeIdx > 0,
+                            hasNextLesson: activeIdx < lessons.length - 1,
+                            showLessonsButton: true,
+                            onOpenLessons: () =>
+                              document.getElementById("course-lesson-panel")?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "nearest",
+                              }),
+                          }
+                        : {})}
+                    />
                   )}
                 </div>
               ) : (
