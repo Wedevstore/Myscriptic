@@ -42,6 +42,8 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   register: (name: string, email: string, password: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>
+  loginWithGoogleCredential: (credential: string) => Promise<{ success: boolean; error?: string }>
+  loginWithApple: (identityToken: string, nonce?: string, userJson?: string) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   updateUser: (partial: Partial<AuthUser>) => void
 }
@@ -247,6 +249,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [laravel]
   )
 
+  const loginWithGoogleCredential = React.useCallback(
+    async (credential: string): Promise<{ success: boolean; error?: string }> => {
+      if (!laravel) {
+        return {
+          success: false,
+          error: "Google sign-in needs the API (set NEXT_PUBLIC_API_URL and Laravel auth).",
+        }
+      }
+      try {
+        const res = await authApi.google(credential)
+        const user = normalizeAuthUser(res.user)
+        saveToStorage(user, res.token)
+        setState({ user, token: res.token, isLoading: false, isAuthenticated: true })
+        await mergeLocalCartToServer()
+        return { success: true }
+      } catch (e) {
+        return {
+          success: false,
+          error: e instanceof Error ? e.message : "Google sign-in failed.",
+        }
+      }
+    },
+    [laravel]
+  )
+
+  const loginWithApple = React.useCallback(
+    async (
+      identityToken: string,
+      nonce?: string,
+      userJson?: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      if (!laravel) {
+        return {
+          success: false,
+          error: "Apple sign-in needs the API (set NEXT_PUBLIC_API_URL and Laravel auth).",
+        }
+      }
+      try {
+        const res = await authApi.apple(identityToken, nonce, userJson)
+        const user = normalizeAuthUser(res.user)
+        saveToStorage(user, res.token)
+        setState({ user, token: res.token, isLoading: false, isAuthenticated: true })
+        await mergeLocalCartToServer()
+        return { success: true }
+      } catch (e) {
+        return {
+          success: false,
+          error: e instanceof Error ? e.message : "Apple sign-in failed.",
+        }
+      }
+    },
+    [laravel]
+  )
+
   const logout = React.useCallback(() => {
     if (laravel && typeof window !== "undefined") {
       try {
@@ -273,7 +329,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout, updateUser }}>
+    <AuthContext.Provider
+      value={{
+        ...state,
+        login,
+        register,
+        loginWithGoogleCredential,
+        loginWithApple,
+        logout,
+        updateUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

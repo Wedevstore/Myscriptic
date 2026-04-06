@@ -5,13 +5,14 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { safeInternalPath } from "@/lib/safe-internal-path"
 import { useAuth } from "@/components/providers/auth-provider"
+import { SocialLoginButtons } from "@/components/auth/social-login-buttons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-  Eye, EyeOff, Mail, Lock, BookOpen, Chrome, AlertCircle, Loader2, ArrowLeft,
+  Eye, EyeOff, Mail, Lock, AlertCircle, Loader2, ArrowLeft,
 } from "lucide-react"
 
 export default function LoginPage() {
@@ -19,6 +20,10 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const { login, isAuthenticated } = useAuth()
   const afterLogin = safeInternalPath(searchParams.get("next") ?? searchParams.get("redirect"))
+
+  const goAfterLogin = React.useCallback(() => {
+    router.push(afterLogin)
+  }, [router, afterLogin])
   const registerHref =
     afterLogin === "/"
       ? "/auth/register"
@@ -50,7 +55,7 @@ export default function LoginPage() {
     const result = await login(form.email, form.password)
     setLoading(false)
     if (!result.success) setError(result.error ?? "Login failed.")
-    else router.push(afterLogin)
+    else goAfterLogin()
   }
 
   return (
@@ -189,16 +194,7 @@ export default function LoginPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="gap-2 h-11">
-              <Chrome size={16} />
-              Google
-            </Button>
-            <Button variant="outline" className="gap-2 h-11">
-              <BookOpen size={16} />
-              Apple
-            </Button>
-          </div>
+          <SocialLoginButtons disabled={loading} onSocialSuccess={goAfterLogin} />
 
           <p className="text-center text-sm text-muted-foreground mt-8">
             Don&apos;t have an account?{" "}

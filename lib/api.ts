@@ -181,6 +181,20 @@ export const authApi = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+  google: (credential: string) =>
+    request<{ token: string; user: unknown }>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ credential }),
+    }),
+  apple: (identityToken: string, nonce?: string, userJson?: string) =>
+    request<{ token: string; user: unknown }>("/auth/apple", {
+      method: "POST",
+      body: JSON.stringify({
+        identity_token: identityToken,
+        ...(nonce ? { nonce } : {}),
+        ...(userJson ? { user: userJson } : {}),
+      }),
+    }),
 }
 
 // ── Public contact ────────────────────────────────────────────────────────────
