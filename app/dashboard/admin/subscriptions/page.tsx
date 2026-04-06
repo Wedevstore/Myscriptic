@@ -414,7 +414,9 @@ function SubscriptionsContent() {
   function exportRecentSubscriptionsCsv() {
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
     const lines = [
-      `# ${live ? "Demo rows only — subscriber list not on admin API" : "Local mock data"}`,
+      live
+        ? "# source: demo table only — plans load from API; subscriber list is not exposed on admin API yet"
+        : "# source: local demo store",
       ["id", "user", "email", "plan", "start_date", "status", "renews_at"].join(","),
       ...RECENT_SUBS.map(s =>
         [s.id, s.user, s.email, s.plan, s.startDate, s.status, s.renewsAt].map(esc).join(",")
@@ -423,7 +425,7 @@ function SubscriptionsContent() {
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
     const a = document.createElement("a")
     a.href = URL.createObjectURL(blob)
-    a.download = `recent-subscriptions-${live ? "demo" : "mock"}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `recent-subscriptions-demo-table-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
   }

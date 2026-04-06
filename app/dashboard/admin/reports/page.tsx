@@ -125,6 +125,69 @@ function mapAuditApi(row: Record<string, unknown>): AuditRow {
   } as AuditRow
 }
 
+function escReportsCsv(s: string) {
+  return `"${String(s).replace(/"/g, '""')}"`
+}
+
+function triggerReportsCsvDownload(lines: string[], basename: string) {
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(blob)
+  a.download = basename
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+/** Browser snapshot of the payout table (respects search / status filters). */
+function exportReportsPayoutsClient(rows: PayoutRow[], live: boolean) {
+  const header = ["id", "author", "email", "weight_or_reads", "pool_or_engagement_pct", "gross", "commission", "net", "status"]
+  const lines = [
+    live ? "# source: API (visible rows only; server export may include full list)" : "# source: local demo store",
+    "# note: search and status filters applied in browser",
+    header.join(","),
+    ...rows.map(r =>
+      [
+        r.id,
+        r.author,
+        r.email,
+        String(r.reads),
+        String(r.engagement),
+        String(r.gross),
+        String(r.commission),
+        String(r.net),
+        r.status,
+      ]
+        .map(escReportsCsv)
+        .join(",")
+    ),
+  ]
+  const d = new Date().toISOString().slice(0, 10)
+  triggerReportsCsvDownload(lines, `reports-payouts-${live ? "api-visible" : "demo"}-${d}.csv`)
+}
+
+function exportReportsAuditClient(rows: AuditRow[], live: boolean) {
+  const header = ["id", "event", "performed_by", "target", "amount", "timestamp", "status"]
+  const lines = [
+    live ? "# source: API (audit-logs snapshot in browser)" : "# source: local demo store",
+    header.join(","),
+    ...rows.map(log =>
+      [
+        log.id,
+        log.event,
+        log.user,
+        log.author ?? "",
+        log.amount != null ? String(log.amount) : "",
+        log.timestamp,
+        log.status,
+      ]
+        .map(escReportsCsv)
+        .join(",")
+    ),
+  ]
+  const d = new Date().toISOString().slice(0, 10)
+  triggerReportsCsvDownload(lines, `reports-audit-${live ? "api" : "demo"}-${d}.csv`)
+}
+
 function AdminReportsContent() {
   const live = apiUrlConfigured()
   const [activeTab, setActiveTab] = React.useState<"payouts" | "audit">("payouts")
@@ -305,7 +368,17 @@ function AdminReportsContent() {
             size="sm"
             type="button"
             onClick={() => {
-              if (live) void adminApi.authorPayoutsExport().catch(e => setLoadErr(e instanceof Error ? e.message : "Export failed"))
+              if (activeTab === "audit") {
+                exportReportsAuditClient(live ? auditRows : AUDIT_LOG, live)
+                return
+              }
+              if (live) {
+                void adminApi.authorPayoutsExport().catch(e =>
+                  setLoadErr(e instanceof Error ? e.message : "Export failed")
+                )
+                return
+              }
+              exportReportsPayoutsClient(filteredReports, false)
             }}
           >
             <Download size={14} /> Export CSV
