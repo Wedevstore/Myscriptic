@@ -7,6 +7,8 @@ export type VideoProvider = "youtube" | "vimeo"
 
 export interface ParsedVideo {
   provider: VideoProvider
+  /** YouTube 11-char id or Vimeo numeric id string */
+  videoId: string
   embedUrl: string
 }
 
@@ -53,6 +55,7 @@ export function parseVideoUrl(url: string): ParsedVideo | null {
   if (yt) {
     return {
       provider: "youtube",
+      videoId: yt,
       embedUrl: `https://www.youtube-nocookie.com/embed/${yt}?rel=0`,
     }
   }
@@ -60,6 +63,7 @@ export function parseVideoUrl(url: string): ParsedVideo | null {
   if (vm) {
     return {
       provider: "vimeo",
+      videoId: vm,
       embedUrl: `https://player.vimeo.com/video/${vm}`,
     }
   }

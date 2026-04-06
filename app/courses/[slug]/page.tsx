@@ -181,7 +181,10 @@ function CourseSlugInner() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-10">
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-10">
             <div className="lg:col-span-4 order-2 lg:order-1">
-              <div className="lg:sticky lg:top-24 rounded-2xl border border-border bg-card overflow-hidden">
+              <div
+                id="course-lesson-panel"
+                className="lg:sticky lg:top-24 rounded-2xl border border-border bg-card overflow-hidden scroll-mt-24"
+              >
                 <div className="px-4 py-3 border-b border-border bg-muted/40 flex items-center gap-2">
                   <ListVideo size={16} className="text-brand" />
                   <span className="text-sm font-semibold text-foreground">Lessons</span>
@@ -216,7 +219,9 @@ function CourseSlugInner() {
                     <p className="text-xs text-muted-foreground">
                       {paywalledPaidPlayback
                         ? "Video playback unlocks after purchase."
-                        : `Video plays from ${invalidLesson ? "linked provider" : "embedded player"} — hosted on YouTube or Vimeo.`}
+                        : invalidLesson
+                          ? "This lesson link cannot be embedded here — open it in a new tab below."
+                          : "Use the controls below the player — video is hosted on YouTube or Vimeo."}
                     </p>
                   </div>
                   {course.accessType === "SUBSCRIPTION" && !isOwner ? (
@@ -251,7 +256,24 @@ function CourseSlugInner() {
                     </div>
                   ) : (
                     <>
-                      <VideoEmbedFrame url={lesson.videoUrl} title={lesson.title} />
+                      <VideoEmbedFrame
+                        url={lesson.videoUrl}
+                        title={lesson.title}
+                        {...(lessons.length > 1
+                          ? {
+                              onPreviousLesson: () => setActiveIdx(i => Math.max(0, i - 1)),
+                              onNextLesson: () => setActiveIdx(i => Math.min(lessons.length - 1, i + 1)),
+                              hasPreviousLesson: activeIdx > 0,
+                              hasNextLesson: activeIdx < lessons.length - 1,
+                              showLessonsButton: true,
+                              onOpenLessons: () =>
+                                document.getElementById("course-lesson-panel")?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "nearest",
+                                }),
+                            }
+                          : {})}
+                      />
                       {!invalidLesson && (
                         <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                           <ExternalLink size={10} />
