@@ -52,6 +52,10 @@ const PAYOUT_REPORTS = [
   { id: "rpt_006", author: "Kofi Mensah",   email: "k.author@mail.com", reads: 7200,  engagement: 4.8,  gross: 671.33,  commission: 201.40, net: 469.93,  status: "pending" },
 ]
 
+function clonePayoutTemplate(): PayoutRow[] {
+  return PAYOUT_REPORTS.map(r => ({ ...r }))
+}
+
 // ── Monthly revenue chart data ────────────────────────────────────────────────
 const REVENUE_CHART = [
   { month: "Aug", revenue: 92400, authorPool: 64680, commission: 27720 },
@@ -197,7 +201,7 @@ function AdminReportsContent() {
   const [activeTab, setActiveTab] = React.useState<"payouts" | "audit">("payouts")
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
-  const [payoutRows, setPayoutRows] = React.useState<PayoutRow[]>(PAYOUT_REPORTS)
+  const [payoutRows, setPayoutRows] = React.useState<PayoutRow[]>(clonePayoutTemplate)
   const [auditRows, setAuditRows] = React.useState<AuditRow[]>(AUDIT_LOG)
   const [dash, setDash] = React.useState<Record<string, number> | null>(null)
   const [revMonthly, setRevMonthly] = React.useState<{ month: string; total: number }[]>([])
@@ -207,7 +211,7 @@ function AdminReportsContent() {
 
   const reload = React.useCallback(async () => {
     if (!live) {
-      setPayoutRows(PAYOUT_REPORTS)
+      setPayoutRows(clonePayoutTemplate())
       setAuditRows(AUDIT_LOG)
       return
     }
@@ -251,7 +255,7 @@ function AdminReportsContent() {
     return () => { cancel = true }
   }, [live, activeTab])
 
-  const reportSource = live ? payoutRows : PAYOUT_REPORTS
+  const reportSource = payoutRows
 
   // Filter reports
   const filteredReports = reportSource.filter(r => {
@@ -318,7 +322,10 @@ function AdminReportsContent() {
       ]
 
   async function handleApprovePayout(id: string) {
-    if (!live) return
+    if (!live) {
+      setPayoutRows(prev => prev.map(r => (r.id === id ? { ...r, status: "paid" as const } : r)))
+      return
+    }
     setPayoutBusy(id)
     try {
       await adminApi.approveAuthorPayout(id)
@@ -331,7 +338,10 @@ function AdminReportsContent() {
   }
 
   async function handleHoldPayout(id: string) {
-    if (!live) return
+    if (!live) {
+      setPayoutRows(prev => prev.map(r => (r.id === id ? { ...r, status: "held" as const } : r)))
+      return
+    }
     setPayoutBusy(id)
     try {
       await adminApi.holdAuthorPayout(id)
@@ -589,16 +599,28 @@ function AdminReportsContent() {
                           )}
                           {r.status === "pending" && !live && (
                             <>
-                              <button type="button" className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1">
+                              <button
+                                type="button"
+                                className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1"
+                                onClick={() => void handleApprovePayout(r.id)}
+                              >
                                 <CheckCircle size={11} /> Approve
                               </button>
-                              <button type="button" className="px-2.5 py-1 rounded bg-red-100 dark:bg-red-900/20 text-red-500 text-[11px] font-semibold hover:bg-red-200 transition-colors flex items-center gap-1">
+                              <button
+                                type="button"
+                                className="px-2.5 py-1 rounded bg-red-100 dark:bg-red-900/20 text-red-500 text-[11px] font-semibold hover:bg-red-200 transition-colors flex items-center gap-1"
+                                onClick={() => void handleHoldPayout(r.id)}
+                              >
                                 <Clock size={11} /> Hold
                               </button>
                             </>
                           )}
                           {r.status === "held" && !live && (
-                            <button type="button" className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1">
+                            <button
+                              type="button"
+                              className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-[11px] font-semibold hover:bg-green-200 transition-colors flex items-center gap-1"
+                              onClick={() => void handleApprovePayout(r.id)}
+                            >
                               <CheckCircle size={11} /> Release
                             </button>
                           )}
