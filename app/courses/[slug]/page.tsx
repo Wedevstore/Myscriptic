@@ -86,6 +86,27 @@ function CourseSlugInner() {
     setActiveIdx(0)
   }, [slug, course?.id])
 
+  const lessonScrollPrevIdxRef = React.useRef<number | null>(null)
+
+  React.useEffect(() => {
+    lessonScrollPrevIdxRef.current = null
+  }, [slug, course?.id])
+
+  React.useEffect(() => {
+    if (!course || !visible) return
+    const lessons = sortLessons(course)
+    const lesson = lessons[activeIdx]
+    if (!lesson) return
+    const prev = lessonScrollPrevIdxRef.current
+    lessonScrollPrevIdxRef.current = activeIdx
+    if (prev !== null && prev !== activeIdx) {
+      document.getElementById("course-lesson-player")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    }
+  }, [activeIdx, course, visible])
+
   const pageLoading =
     course === undefined ||
     (fromApi && preview && authLoading) ||
@@ -213,7 +234,7 @@ function CourseSlugInner() {
 
             <div className="lg:col-span-8 order-1 lg:order-2 space-y-4">
               {lesson ? (
-                <>
+                <div id="course-lesson-player" className="space-y-4 scroll-mt-24">
                   <div>
                     <h2 className="font-serif text-lg font-bold text-foreground mb-1">{lesson.title}</h2>
                     <p className="text-xs text-muted-foreground">
@@ -286,7 +307,7 @@ function CourseSlugInner() {
                       )}
                     </>
                   )}
-                </>
+                </div>
               ) : (
                 <p className="text-muted-foreground text-sm">No lessons in this course yet.</p>
               )}

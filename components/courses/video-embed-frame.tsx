@@ -3,6 +3,12 @@
 import * as React from "react"
 import { parseVideoUrl } from "@/lib/video-embed"
 import { loadYouTubeIframeAPI } from "@/lib/youtube-iframe-api"
+import {
+  readCourseVideoMuted,
+  readCourseVideoVolume,
+  writeCourseVideoMuted,
+  writeCourseVideoVolume,
+} from "@/lib/course-video-prefs"
 import { cn } from "@/lib/utils"
 import {
   AlertCircle,
@@ -103,6 +109,19 @@ export function VideoEmbedFrame({
   const [muted, setMuted] = React.useState(false)
   const [looping, setLooping] = React.useState(false)
 
+  React.useLayoutEffect(() => {
+    setVolume(readCourseVideoVolume())
+    setMuted(readCourseVideoMuted())
+  }, [])
+
+  React.useEffect(() => {
+    writeCourseVideoVolume(volume)
+  }, [volume])
+
+  React.useEffect(() => {
+    writeCourseVideoMuted(muted)
+  }, [muted])
+
   React.useEffect(() => {
     loopingRef.current = looping
   }, [looping])
@@ -168,8 +187,6 @@ export function VideoEmbedFrame({
               setApiReady(true)
               try {
                 player.setPlaybackRate(SPEEDS[speedIdx] ?? 1)
-                player.unMute()
-                player.setVolume(volume)
               } catch {
                 /* rate may be unavailable until playback */
               }
@@ -230,7 +247,6 @@ export function VideoEmbedFrame({
           setApiReady(true)
           try {
             await player.setPlaybackRate(SPEEDS[speedIdx] ?? 1)
-            await player.setVolume(volume / 100)
           } catch {
             /* ignore */
           }
