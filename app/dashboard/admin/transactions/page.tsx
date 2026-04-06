@@ -145,9 +145,18 @@ function TxnRow({ txn, live }: { txn: Transaction; live: boolean }) {
                 </pre>
               </div>
               <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Order ID</span>
-                  <span className="font-mono text-foreground">{txn.orderId}</span>
+                <div className="flex justify-between items-baseline gap-2">
+                  <span className="text-muted-foreground shrink-0">Order ID</span>
+                  {txn.orderId ? (
+                    <Link
+                      href={`/invoice/${txn.orderId}`}
+                      className="font-mono text-brand hover:underline text-right break-all"
+                    >
+                      {txn.orderId}
+                    </Link>
+                  ) : (
+                    <span className="font-mono text-foreground">—</span>
+                  )}
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">User ID</span>

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -377,11 +378,22 @@ export default function AdminUsersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem className="text-xs gap-2 cursor-pointer" disabled>
-                            <Eye size={12} /> View Profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs gap-2 cursor-pointer" disabled>
-                            <Mail size={12} /> Send Email
+                          {u.role === "author" && u.id ? (
+                            <DropdownMenuItem asChild className="text-xs gap-2 cursor-pointer">
+                              <Link href={`/authors/${u.id}`} className="flex items-center gap-2">
+                                <Eye size={12} /> Author profile
+                              </Link>
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem disabled className="text-xs gap-2 opacity-60">
+                              <Eye size={12} /> Author profile
+                              <span className="text-[10px] text-muted-foreground font-normal">(authors only)</span>
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem asChild className="text-xs gap-2 cursor-pointer">
+                            <a href={`mailto:${encodeURIComponent(u.email)}`} className="flex items-center gap-2">
+                              <Mail size={12} /> Send email
+                            </a>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className={cn(
