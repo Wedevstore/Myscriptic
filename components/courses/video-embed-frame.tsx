@@ -585,7 +585,7 @@ export function VideoEmbedFrame({
             type="button"
             onClick={togglePlay}
             disabled={!apiReady}
-            className="w-16 h-16 rounded-full bg-brand hover:bg-brand-dark text-primary-foreground flex items-center justify-center shadow-lg shadow-brand/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+            className="w-16 h-16 rounded-full bg-brand hover:bg-brand-dark text-primary-foreground flex items-center justify-center shadow-lg shadow-brand/30 transition-all hover:scale-105 active:scale-95 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 disabled:opacity-40 disabled:hover:scale-100"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isPlaying ? (

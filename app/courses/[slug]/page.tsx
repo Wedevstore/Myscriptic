@@ -210,25 +210,31 @@ function CourseSlugInner() {
                   <ListVideo size={16} className="text-brand" />
                   <span className="text-sm font-semibold text-foreground">Lessons</span>
                 </div>
-                <ol className="divide-y divide-border max-h-[min(70vh,520px)] overflow-y-auto">
-                  {lessons.map((l, i) => (
-                    <li key={l.id}>
-                      <button
-                        type="button"
-                        onClick={() => setActiveIdx(i)}
-                        className={cn(
-                          "w-full text-left px-4 py-3 text-sm transition-colors flex gap-3",
-                          i === activeIdx
-                            ? "bg-brand/10 text-brand font-medium"
-                            : "text-foreground hover:bg-muted/60"
-                        )}
-                      >
-                        <span className="tabular-nums text-muted-foreground w-5 shrink-0">{i + 1}.</span>
-                        <span className="line-clamp-2">{l.title}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ol>
+                <nav aria-label="Course lessons" className="max-h-[min(70vh,520px)] overflow-y-auto">
+                  <ol className="divide-y divide-border">
+                    {lessons.map((l, i) => (
+                      <li key={l.id}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveIdx(i)}
+                          aria-current={i === activeIdx ? "true" : undefined}
+                          aria-label={`Lesson ${i + 1}: ${l.title}`}
+                          className={cn(
+                            "w-full text-left px-4 py-3 text-sm transition-colors flex gap-3",
+                            i === activeIdx
+                              ? "bg-brand/10 text-brand font-medium"
+                              : "text-foreground hover:bg-muted/60"
+                          )}
+                        >
+                          <span className="tabular-nums text-muted-foreground w-5 shrink-0" aria-hidden>
+                            {i + 1}.
+                          </span>
+                          <span className="line-clamp-2">{l.title}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </nav>
               </div>
             </div>
 
