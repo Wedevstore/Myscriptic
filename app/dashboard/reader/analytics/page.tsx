@@ -265,7 +265,7 @@ function AnalyticsContent() {
     return () => {
       alive = false
     }
-  }, [useLiveApi, user?.id])
+  }, [useLiveApi, user])
 
   const engagementRows = React.useMemo(
     () => records.map(engagementToRow),

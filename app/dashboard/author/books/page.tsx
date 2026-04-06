@@ -190,7 +190,7 @@ function AuthorBooksContent() {
     return () => {
       alive = false
     }
-  }, [useLiveApi, user?.id])
+  }, [useLiveApi, user])
 
   const tableRows = useLiveApi ? (liveBooks ?? []) : MOCK_AUTHOR_ROWS
   const tableBootstrapping = useLiveApi && liveLoading && liveBooks === null

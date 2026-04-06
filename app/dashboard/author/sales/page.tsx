@@ -449,7 +449,7 @@ function SalesContent() {
     return () => {
       alive = false
     }
-  }, [useLiveApi, user?.id])
+  }, [useLiveApi, user])
 
   if (isLoading || !user) {
     return (
