@@ -10,15 +10,15 @@ This guide covers deploying the **Laravel API** and **Next.js** frontend for rea
 
 ## Environment variables
 
-### Backend (`backend/.env`)
+### Backend (Laravel on the API server)
 
-Copy from `backend/.env.example` and set at minimum:
+The Laravel app is **not** in this repository; it lives on the VPS (e.g. CyberPanel site root for **`api.myscriptic.com`**). Edit **`.env`** there and set at minimum:
 
 | Area | Variables |
 |------|-----------|
 | Core | `APP_KEY`, `APP_URL`, `APP_ENV=production`, `APP_DEBUG=false` |
 | DB | `DB_*` (use managed MySQL/Postgres in production) |
-| CORS | `CORS_ALLOWED_ORIGINS` — comma-separated origins (no spaces); include **apex, `www`, production Vercel host, and `http://localhost:3000`** as needed. Do **not** use `*` — `config/cors.php` strips it so responses echo the real `Origin` instead of `Access-Control-Allow-Origin: *`. |
+| CORS | `CORS_ALLOWED_ORIGINS` — comma-separated origins (no spaces); include **apex, `www`, production Vercel host, and `http://localhost:3000`** as needed. Some reverse-proxy stacks require `CORS_ALLOWED_ORIGINS=*` with Bearer-only APIs; prefer explicit origins when your proxy passes them through. |
 | CORS previews | `CORS_USE_VERCEL_PREVIEW_ORIGINS=true` (default) allows `https://*.vercel.app` via `config/cors.php` patterns; set `false` to rely only on `CORS_ALLOWED_ORIGINS`. |
 | Frontend | `FRONTEND_URL` — must match the live site (**`https://www.myscriptic.com`** when that is canonical) and **Vercel `NEXT_PUBLIC_SITE_URL`**; use **`https://myscriptic.vercel.app`** for preview-only checkout. Mismatch causes wrong redirects after payment. |
 | Cache | `CACHE_STORE=redis`, `REDIS_*` |
@@ -41,13 +41,14 @@ Run `php artisan config:cache` and `php artisan route:cache` after changes.
 
 ## Laravel on Ubuntu (VPS)
 
-1. Install PHP 8.2+, extensions (`curl`, `mbstring`, `xml`, `redis`, `pdo_mysql` or `pdo_pgsql`), Composer, Nginx, Redis, Node (if building assets on server).
-2. Clone the repo; `cd backend && composer install --no-dev --optimize-autoloader`.
-3. Point the web root to `backend/public` (Nginx `root` / `try_files` to `index.php`).
-4. **PHP-FPM**: pool user should own `storage/` and `bootstrap/cache`.
-5. **Scheduler**: add cron: `* * * * * cd /path/to/backend && php artisan schedule:run >> /dev/null 2>&1`
-6. **Queues**: run `php artisan queue:work redis --sleep=3 --tries=3` under **Supervisor** (or systemd). Required for queued notifications (welcome, purchase, subscription).
-7. **Opcache** enabled in production `php.ini`.
+1. Install PHP 8.2+ (or **8.4** if required by your Laravel version), extensions (`curl`, `mbstring`, `xml`, `redis`, `pdo_mysql` or `pdo_pgsql`), Composer, Nginx/OpenLiteSpeed, Redis, Node (if building assets on server).
+2. Deploy Laravel files to the server (rsync, CyberPanel site setup, or a private API repo) — **not** from this frontend-only GitHub repo.
+3. From the Laravel app directory: `composer install --no-dev --optimize-autoloader`.
+4. Point the web root to Laravel’s **`public/`** directory (Nginx `root` / `try_files` to `index.php`).
+5. **PHP-FPM**: pool user should own `storage/` and `bootstrap/cache`.
+6. **Scheduler**: add cron: `* * * * * cd /path/to/laravel && php artisan schedule:run >> /dev/null 2>&1`
+7. **Queues**: run `php artisan queue:work redis --sleep=3 --tries=3` under **Supervisor** (or systemd). Required for queued notifications (welcome, purchase, subscription).
+8. **Opcache** enabled in production `php.ini`.
 
 ### Example Nginx snippet
 
@@ -55,7 +56,7 @@ Run `php artisan config:cache` and `php artisan route:cache` after changes.
 server {
     listen 443 ssl http2;
     server_name api.example.com;
-    root /var/www/myscriptic/backend/public;
+    root /var/www/myscriptic/public;
 
     add_header X-Frame-Options "SAMEORIGIN";
     add_header X-Content-Type-Options "nosniff";

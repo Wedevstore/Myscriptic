@@ -4,17 +4,9 @@ This repo’s SPA sets **`NEXT_PUBLIC_API_URL`** to the API **origin only** (e.g
 
 ## 1. Laravel on CyberPanel (PostgreSQL)
 
-### Local PostgreSQL (optional, matches production DB name)
+### Local PostgreSQL (optional)
 
-From the **`backend/`** folder:
-
-```bash
-docker compose -f docker-compose.postgres.yml up -d
-# or: docker-compose -f docker-compose.postgres.yml up -d
-php artisan migrate
-```
-
-Default credentials match **`backend/.env.example`**: database `myscriptic`, user `myscriptic`, password `myscriptic`. Change `DB_PASSWORD` on the server to your CyberPanel-generated password.
+If you run Laravel **locally** (separate checkout or Docker), create a Postgres database and run `php artisan migrate` there. Production credentials come from **CyberPanel** / your host — not from this repo.
 
 ### Database
 
@@ -58,7 +50,7 @@ Laravel reads **`CORS_ALLOWED_ORIGINS`** (comma-separated, no spaces after comma
 CORS_ALLOWED_ORIGINS=https://myscriptic.com,https://www.myscriptic.com,https://myscriptic.vercel.app,http://localhost:3000
 ```
 
-**Preview deployments:** `backend/config/cors.php` also applies a pattern for **`https://*.vercel.app`** when **`CORS_USE_VERCEL_PREVIEW_ORIGINS=true`** (default). Set **`CORS_USE_VERCEL_PREVIEW_ORIGINS=false`** if you want to allow only origins listed explicitly in `CORS_ALLOWED_ORIGINS`.
+**Preview deployments:** on the server, `config/cors.php` can apply a pattern for **`https://*.vercel.app`** when **`CORS_USE_VERCEL_PREVIEW_ORIGINS=true`**. Set **`CORS_USE_VERCEL_PREVIEW_ORIGINS=false`** if you want to allow only origins listed explicitly in `CORS_ALLOWED_ORIGINS`.
 
 After changing `.env`, refresh config cache (e.g. as your deploy user):
 
@@ -67,9 +59,9 @@ php artisan config:clear
 php artisan config:cache
 ```
 
-**Check:** preflight with `Origin: https://www.myscriptic.com` (or your preview URL) should echo **that same origin** in **`Access-Control-Allow-Origin`** — not `*`. The app config strips a lone `*` from `CORS_ALLOWED_ORIGINS` so php-cors never uses allow-all mode; remove `CORS_ALLOWED_ORIGINS=*` from server `.env` if it was set, then `config:cache` again.
+**Check:** preflight with `Origin: https://www.myscriptic.com` (or your preview URL) should return a valid **`Access-Control-Allow-Origin`** (echoed origin or `*` depending on `.env` and reverse proxy). After edits, run `config:clear` and `config:cache`.
 
-**Proxy:** If OpenLiteSpeed/Nginx adds its own `Access-Control-Allow-Origin`, remove or align it so only Laravel sets CORS (duplicate or `*` headers confuse browsers).
+**Proxy:** OpenLiteSpeed in front of Apache can alter CORS; if the browser shows CORS errors, inspect the final response headers (you may need `CORS_ALLOWED_ORIGINS=*` with Bearer-only APIs).
 
 ### Frontend URL (emails, redirects, Phase 2 helpers)
 
@@ -101,7 +93,7 @@ In **Vercel → Project → Settings → Environment Variables**, set at least:
 
 `NEXT_PUBLIC_*` variables are applied at **build** time. **Redeploy Production** (or push a commit) after changing them so the client bundle picks up values like **`NEXT_PUBLIC_SITE_URL`**. New Preview deployments pick up Preview env automatically; redeploy an open preview if you need new vars immediately.
 
-Preview hostnames: with **`CORS_USE_VERCEL_PREVIEW_ORIGINS=true`**, `https://*.vercel.app` is covered by **`backend/config/cors.php`**. Turn it off if you need a strict explicit list only.
+Preview hostnames: with **`CORS_USE_VERCEL_PREVIEW_ORIGINS=true`**, `https://*.vercel.app` is covered by Laravel’s **`config/cors.php`** on the server. Turn it off if you need a strict explicit list only.
 
 ---
 
@@ -131,4 +123,4 @@ Preview hostnames: with **`CORS_USE_VERCEL_PREVIEW_ORIGINS=true`**, `https://*.v
 
 ## 5. Git workflow (unchanged)
 
-Push to **`main`** → GitHub Actions runs **CI** (`.github/workflows/ci.yml`) → Vercel builds from Git. Laravel on CyberPanel updates only when **you deploy** the PHP app (git pull, composer, migrate, restart PHP/OpenLiteSpeed if needed)—Vercel does not deploy Laravel.
+Push to **`main`** → GitHub Actions runs **CI** (`.github/workflows/ci.yml`) → Vercel builds **this frontend repo** from Git. Laravel on CyberPanel updates only when **you deploy** the PHP app on the server (not via this repository)—Vercel does not deploy Laravel.

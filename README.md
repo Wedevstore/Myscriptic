@@ -47,7 +47,7 @@ The frontend is designed to deploy on **[Vercel](https://vercel.com)** from GitH
 
 - **Wire Vercel ↔ Laravel ↔ DB:** [docs/production-api-vercel-cyberpanel.md](docs/production-api-vercel-cyberpanel.md)
 - **Next.js:** copy [`.env.example`](.env.example) to `.env.local` — `NEXT_PUBLIC_API_URL` is the **API origin only** (e.g. `https://api.myscriptic.com`); the app appends `/api` for Laravel routes. Set **`NEXT_PUBLIC_SITE_URL`** to the canonical site (**`https://www.myscriptic.com`** in production, **`http://localhost:3000`** locally; Vercel Preview often uses **`https://myscriptic.vercel.app`**).
-- **Laravel + PostgreSQL:** `backend/.env.example` — local DB via `docker compose -f backend/docker-compose.postgres.yml up -d`, then `php artisan migrate`
+- **Laravel + PostgreSQL:** maintained on the **API server** (e.g. **`api.myscriptic.com`** / CyberPanel), not in this repository. Configure `.env`, PostgreSQL, CORS, and `php artisan migrate` there.
 
 Check out the [Next.js deployment documentation](https://nextjs.org/docs/deployment) for Vercel specifics.
 
