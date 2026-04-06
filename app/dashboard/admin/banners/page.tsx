@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import { adminApi } from "@/lib/api"
 import { seedP4, bannerStore, type Banner } from "@/lib/store-p4"
-import { Plus, Image, Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, Save, Download } from "lucide-react"
+import { Plus, Image as ImageIcon, Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, Save, Download } from "lucide-react"
 
 /** Live carousel slide (homepage `hero_carousel` item_type `banner`) */
 type HeroBanner = Banner & { sectionId: string; itemId: string }
@@ -434,7 +434,7 @@ export default function AdminBannersPage() {
           ))}
         {!loading && sorted.length === 0 && (
           <div className="text-center py-16 border-2 border-dashed border-border rounded-xl">
-            <Image size={28} className="mx-auto mb-3 text-muted-foreground/40" />
+            <ImageIcon size={28} className="mx-auto mb-3 text-muted-foreground/40" aria-hidden />
             <p className="text-sm text-muted-foreground">
               {live
                 ? "No hero carousel or no banner slides yet. Add a banner to create the section automatically."

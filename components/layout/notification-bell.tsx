@@ -49,7 +49,7 @@ export function NotificationBell({ userId }: Props) {
   const [fromApi, setFromApi] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
 
-  async function load() {
+  const load = React.useCallback(async () => {
     if (!hasSanctumToken()) {
       setFromApi(false)
       seedP4()
@@ -87,9 +87,11 @@ export function NotificationBell({ userId }: Props) {
     seedP4()
     const uid = userId ?? "guest"
     setNotifs(notificationStore.getForUser(uid).slice(0, 8))
-  }
+  }, [userId])
 
-  React.useEffect(() => { load() }, [userId])
+  React.useEffect(() => {
+    void load()
+  }, [load])
 
   // close on outside click
   React.useEffect(() => {
