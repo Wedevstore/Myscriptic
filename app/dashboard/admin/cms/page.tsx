@@ -15,6 +15,7 @@ import { seedP4, cmsSectionStore, type CmsSection, type SectionType } from "@/li
 import {
   Plus, GripVertical, Pencil, Trash2, Eye, EyeOff,
   Image, BookOpen, LayoutGrid, Zap, Star, ChevronUp, ChevronDown, Save, Download,
+  Clapperboard,
 } from "lucide-react"
 
 type SectionRow = CmsSection & { laravelType?: string }
@@ -25,6 +26,11 @@ const TYPE_META: Record<SectionType, { label: string; icon: React.ElementType; c
   category_list: { label: "Categories", icon: LayoutGrid, color: "bg-purple-50 dark:bg-purple-900/20 text-purple-500" },
   flash_sale: { label: "Flash Sale", icon: Zap, color: "bg-red-50 dark:bg-red-900/20 text-red-500" },
   featured: { label: "Featured", icon: Star, color: "bg-green-50 dark:bg-green-900/20 text-green-500" },
+  course_list: {
+    label: "Author courses",
+    icon: Clapperboard,
+    color: "bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400",
+  },
 }
 
 const BOOK_OPTIONS = [
@@ -54,6 +60,7 @@ const FRONT_TO_API: Record<SectionType, string> = {
   category_list: "category_strip",
   flash_sale: "flash_sale",
   featured: "subscription_cta",
+  course_list: "author_courses",
 }
 
 function mapHomepageSection(row: Record<string, unknown>): SectionRow {
@@ -65,6 +72,7 @@ function mapHomepageSection(row: Record<string, unknown>): SectionRow {
     flash_sale: "flash_sale",
     subscription_cta: "featured",
     custom_html: "featured",
+    author_courses: "course_list",
   }
   const items = (Array.isArray(row.items) ? row.items : []) as Record<string, unknown>[]
   const bookIds = items.map(i => i.book_id).filter(Boolean).map(x => String(x))

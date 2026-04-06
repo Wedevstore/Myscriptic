@@ -17,6 +17,7 @@ import {
   BookOpen, DollarSign, Eye, TrendingUp, Plus,
   BarChart3, Users, Clock, ChevronRight,
   CheckCircle, AlertCircle, Upload, XCircle, Loader2,
+  GraduationCap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { booksApi, authorSalesApi, authorSubscriptionPoolApi } from "@/lib/api"
@@ -621,6 +622,7 @@ function AuthorDashboardContent() {
             <div className="space-y-2">
               {[
                 { label: "Upload New Book",    href: "/dashboard/author/books/new", icon: Upload },
+                { label: "Video courses",      href: "/dashboard/author/courses",   icon: GraduationCap },
                 { label: "Earnings & Payouts", href: "/dashboard/author/earnings",  icon: DollarSign },
                 { label: "View Analytics",     href: "/dashboard/author/sales",     icon: BarChart3 },
                 { label: "Reader Insights",    href: "/dashboard/author/books",     icon: Users },

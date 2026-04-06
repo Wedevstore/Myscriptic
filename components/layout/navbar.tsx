@@ -22,7 +22,7 @@ import {
   TrendingUp, Headphones, BookMarked, LayoutDashboard, LogOut,
   Settings, ChevronDown, Star, BookText, Tag, Users, Library,
   Heart, ShoppingBag,
-  Crown, BarChart2,
+  Crown, BarChart2, GraduationCap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "@/components/ui/cover-image"
@@ -45,6 +45,7 @@ const NAV_LINKS = [
   { label: "Store",        href: "/store",         icon: ShoppingCart },
   { label: "eBooks",       href: "/books",         icon: BookOpen },
   { label: "Audiobooks",   href: "/audiobooks",    icon: Headphones },
+  { label: "Courses",      href: "/courses",       icon: GraduationCap },
   { label: "Subscription", href: "/subscription",  icon: BookMarked },
 ]
 
@@ -58,6 +59,7 @@ const QUICK_ACTIONS = [
   { label: "My Wishlist",        href: "/wishlist",      icon: Heart },
   { label: "Order History",      href: "/orders",        icon: ShoppingBag },
   { label: "Subscription Plans", href: "/subscription",  icon: BookMarked },
+  { label: "Author video courses", href: "/courses",     icon: GraduationCap },
 ]
 
 // ── Trending tags ──────────────────────────────────────────────────────────
@@ -121,7 +123,12 @@ function UserMenu() {
     { label: "My Library",         href: "/library",      icon: Library },
     ...(isSubscriber ? [{ label: "Subscription Library", href: "/subscription/library", icon: Crown, highlight: true }] : []),
     ...(isReader ? [{ label: "Reading Analytics", href: "/dashboard/reader/analytics", icon: BarChart2 }] : []),
-    ...(isAuthor ? [{ label: "Earnings & Payouts", href: "/dashboard/author/earnings", icon: BarChart2 }] : []),
+    ...(isAuthor
+      ? [
+          { label: "Video courses", href: "/dashboard/author/courses", icon: GraduationCap },
+          { label: "Earnings & Payouts", href: "/dashboard/author/earnings", icon: BarChart2 },
+        ]
+      : []),
     { label: "Orders",             href: "/orders",       icon: ShoppingBag },
     { label: "Profile & Settings", href: "/profile",      icon: Settings },
   ]

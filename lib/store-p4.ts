@@ -4,6 +4,8 @@
 // User activity · Activity log · Platform stats
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { seedAuthorCourses } from "@/lib/author-courses-store"
+
 // ── Utility ───────────────────────────────────────────────────────────────────
 function ls<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback
@@ -21,7 +23,13 @@ function now() { return new Date().toISOString() }
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type SectionType = "banner" | "book_list" | "category_list" | "flash_sale" | "featured"
+export type SectionType =
+  | "banner"
+  | "book_list"
+  | "category_list"
+  | "flash_sale"
+  | "featured"
+  | "course_list"
 
 export interface CmsSection {
   id:          string
@@ -381,6 +389,19 @@ export function seedP4() {
     sections.forEach(s => cmsSectionStore.create(s))
   }
 
+  if (!cmsSectionStore.getAll().some(s => s.type === "course_list")) {
+    const all = cmsSectionStore.getAll()
+    const maxPos = all.length ? Math.max(...all.map(s => s.position)) : -1
+    cmsSectionStore.create({
+      title: "Author video courses",
+      type: "course_list",
+      position: maxPos + 1,
+      isActive: true,
+      bookIds: [],
+      categoryIds: [],
+    })
+  }
+
   // Banners
   if (bannerStore.getAll().length === 0) {
     const banners: Omit<Banner,"id"|"createdAt"|"updatedAt">[] = [
@@ -447,4 +468,6 @@ export function seedP4() {
     ]
     logs.forEach(l => activityLogStore.log(l))
   }
+
+  seedAuthorCourses()
 }

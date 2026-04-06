@@ -10,6 +10,7 @@ import { BookSection } from "@/components/home/book-section"
 import { FlashSaleBanner } from "@/components/home/flash-sale-banner"
 import { SubscriptionBanner } from "@/components/home/subscription-banner"
 import { TrendingAuthors } from "@/components/home/trending-authors"
+import { CourseStrip } from "@/components/home/course-strip"
 import { CmsDynamicHome } from "@/components/home/cms-dynamic-home"
 import { Providers } from "@/components/providers"
 import type { BookCardData } from "@/components/books/book-card"
@@ -99,6 +100,7 @@ function MockHomeContent({
   const showFeatured = sectionActive(sections, "featured")
   const showCategories = sectionActive(sections, "category_list")
   const showFlashSale = sectionActive(sections, "flash_sale")
+  const showCourses = sectionActive(sections, "course_list")
 
   return (
     <main id="main-content" className="flex-1 pt-16">
@@ -140,6 +142,7 @@ function MockHomeContent({
         columns={4}
       />
       <TrendingAuthors />
+      {showCourses && <CourseStrip />}
       <BookSection
         title="Free to Read"
         subtitle="Start reading right now — no subscription needed"

@@ -6,6 +6,7 @@ import { CategoryStrip } from "@/components/home/category-strip"
 import { CmsHeroCarousel } from "@/components/home/cms-hero-carousel"
 import { FlashSaleBanner } from "@/components/home/flash-sale-banner"
 import { SubscriptionBanner } from "@/components/home/subscription-banner"
+import { CourseStrip } from "@/components/home/course-strip"
 import type { BookCardData } from "@/components/books/book-card"
 import type { CmsHomepageBook, CmsHomepageSection } from "@/lib/cms-homepage"
 
@@ -75,6 +76,19 @@ export function CmsDynamicHome({ sections }: { sections: CmsHomepageSection[] })
 
           case "subscription_cta":
             return <SubscriptionBanner key={key} />
+
+          case "author_courses":
+            return (
+              <CourseStrip
+                key={key}
+                title={section.title || "Learn from authors"}
+                subtitle={
+                  typeof section.settings?.subtitle === "string"
+                    ? section.settings.subtitle
+                    : undefined
+                }
+              />
+            )
 
           case "custom_html": {
             const html = typeof section.settings?.html === "string" ? section.settings.html : ""
