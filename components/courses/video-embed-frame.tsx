@@ -5,8 +5,10 @@ import { parseVideoUrl } from "@/lib/video-embed"
 import { loadYouTubeIframeAPI } from "@/lib/youtube-iframe-api"
 import {
   readCourseVideoMuted,
+  readCourseVideoSpeedIndex,
   readCourseVideoVolume,
   writeCourseVideoMuted,
+  writeCourseVideoSpeedIndex,
   writeCourseVideoVolume,
 } from "@/lib/course-video-prefs"
 import { cn } from "@/lib/utils"
@@ -112,6 +114,7 @@ export function VideoEmbedFrame({
   React.useLayoutEffect(() => {
     setVolume(readCourseVideoVolume())
     setMuted(readCourseVideoMuted())
+    setSpeedIdx(readCourseVideoSpeedIndex(SPEEDS.length, 2))
   }, [])
 
   React.useEffect(() => {
@@ -121,6 +124,10 @@ export function VideoEmbedFrame({
   React.useEffect(() => {
     writeCourseVideoMuted(muted)
   }, [muted])
+
+  React.useEffect(() => {
+    writeCourseVideoSpeedIndex(speedIdx)
+  }, [speedIdx])
 
   React.useEffect(() => {
     loopingRef.current = looping
