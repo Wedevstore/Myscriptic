@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Navbar } from "@/components/layout/navbar"
 import { Footer } from "@/components/layout/footer"
 import { Providers } from "@/components/providers"
@@ -18,6 +18,7 @@ import {
   loadAuthorFollowIdsFromStorage,
   saveAuthorFollowIdsToStorage,
   formatAuthorFollowerCount,
+  ensureSignedInForAuthorFollow,
 } from "@/lib/author-follows-client"
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
 import {
@@ -118,6 +119,7 @@ function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label
 
 /** Laravel-backed author profile (numeric user id). */
 function LiveAuthorProfile({ authorId }: { authorId: string }) {
+  const router = useRouter()
   const { isAuthenticated } = useAuth()
   const [profile, setProfile] = React.useState<{
     id: string
@@ -172,7 +174,11 @@ function LiveAuthorProfile({ authorId }: { authorId: string }) {
 
   React.useEffect(() => {
     if (!profile) return
-    if (laravelAuthEnabled() && isAuthenticated) {
+    if (!isAuthenticated) {
+      setFollowed(false)
+      return
+    }
+    if (laravelAuthEnabled()) {
       authorFollowsApi
         .listIds()
         .then(res => setFollowed((res.data ?? []).map(String).includes(profile.id)))
@@ -184,6 +190,7 @@ function LiveAuthorProfile({ authorId }: { authorId: string }) {
 
   async function toggleFollow() {
     if (!profile) return
+    if (!ensureSignedInForAuthorFollow(router, isAuthenticated, `/authors/${authorId}`)) return
     const willFollow = !followed
     if (laravelAuthEnabled() && isAuthenticated) {
       setBusyFollow(true)
@@ -407,14 +414,20 @@ function AuthorProfileContent() {
 }
 
 function MockAuthorProfile({ authorId }: { authorId: string }) {
+  const router = useRouter()
+  const { isAuthenticated } = useAuth()
   const author = AUTHOR_PROFILES[authorId]
   const [followed, setFollowed] = React.useState(false)
 
   React.useEffect(() => {
     const a = AUTHOR_PROFILES[authorId]
     if (!a) return
+    if (!isAuthenticated) {
+      setFollowed(false)
+      return
+    }
     setFollowed(loadAuthorFollowIdsFromStorage().has(a.id))
-  }, [authorId])
+  }, [authorId, isAuthenticated])
 
   const authorBooks = React.useMemo(() => {
     const seed = authorId?.charCodeAt(authorId.length - 1) ?? 0
@@ -439,6 +452,7 @@ function MockAuthorProfile({ authorId }: { authorId: string }) {
   }
 
   function toggleFollow() {
+    if (!ensureSignedInForAuthorFollow(router, isAuthenticated, `/authors/${authorId}`)) return
     const willFollow = !followed
     setFollowed(willFollow)
     const next = loadAuthorFollowIdsFromStorage()

@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/layout/navbar"
 import { Footer } from "@/components/layout/footer"
 import { Providers } from "@/components/providers"
@@ -21,7 +22,9 @@ import {
   mergeLegacyDiscoverAuthorFollows,
   loadAuthorFollowIdsFromStorage,
   saveAuthorFollowIdsToStorage,
+  ensureSignedInForAuthorFollow,
 } from "@/lib/author-follows-client"
+import { useAuth } from "@/components/providers/auth-provider"
 
 const GENRE_SPOTLIGHTS_BASE = [
   {
@@ -230,6 +233,8 @@ async function fetchDiscoverLive(): Promise<{
 }
 
 function DiscoverContent() {
+  const router = useRouter()
+  const { isAuthenticated } = useAuth()
   const [activeTab, setActiveTab] = React.useState<"trending" | "new" | "free" | "audio">("trending")
   const [joinedChallenges, setJoinedChallenges] = React.useState<Record<string, boolean>>({})
   const [followAuthorIds, setFollowAuthorIds] = React.useState<Set<string>>(() => new Set())
@@ -239,8 +244,15 @@ function DiscoverContent() {
   React.useEffect(() => {
     mergeLegacyDiscoverAuthorFollows()
     setJoinedChallenges(loadDiscoverFlags(LS_DISCOVER_JOINED))
-    setFollowAuthorIds(loadAuthorFollowIdsFromStorage())
   }, [])
+
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setFollowAuthorIds(new Set())
+      return
+    }
+    setFollowAuthorIds(loadAuthorFollowIdsFromStorage())
+  }, [isAuthenticated])
 
   React.useEffect(() => {
     if (!apiUrlConfigured()) return
@@ -496,6 +508,7 @@ function DiscoverContent() {
                   className="mt-3 h-7 text-xs w-full group-hover:border-brand group-hover:text-brand transition-colors"
                   aria-pressed={followAuthorIds.has(a.id)}
                   onClick={() => {
+                    if (!ensureSignedInForAuthorFollow(router, isAuthenticated, "/discover")) return
                     setFollowAuthorIds(prev => {
                       const next = new Set(prev)
                       if (next.has(a.id)) next.delete(a.id)

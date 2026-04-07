@@ -43,3 +43,20 @@ export function formatAuthorFollowerCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
   return String(n)
 }
+
+type AppRouterLike = { push: (href: string) => void }
+
+/**
+ * Author follows are account-backed. When signed out, send users to login with a return path.
+ * @returns true if the caller may proceed with follow/unfollow logic.
+ */
+export function ensureSignedInForAuthorFollow(
+  router: AppRouterLike,
+  isAuthenticated: boolean,
+  returnPath: string
+): boolean {
+  if (isAuthenticated) return true
+  const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`
+  router.push(`/auth/login?next=${encodeURIComponent(path)}`)
+  return false
+}

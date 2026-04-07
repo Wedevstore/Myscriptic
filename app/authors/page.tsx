@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/layout/navbar"
 import { Footer } from "@/components/layout/footer"
 import { Providers } from "@/components/providers"
@@ -15,6 +16,7 @@ import {
   loadAuthorFollowIdsFromStorage,
   saveAuthorFollowIdsToStorage,
   formatAuthorFollowerCount,
+  ensureSignedInForAuthorFollow,
 } from "@/lib/author-follows-client"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Search, BookOpen, Users, CheckCircle2, Star, ArrowRight } from "lucide-react"
@@ -50,6 +52,7 @@ type AuthorRow = {
 }
 
 function AuthorsContent() {
+  const router = useRouter()
   const { isAuthenticated } = useAuth()
   const apiLive = apiUrlConfigured()
   const laravelAuth = laravelAuthEnabled()
@@ -71,7 +74,11 @@ function AuthorsContent() {
   }, [apiLive])
 
   React.useEffect(() => {
-    if (laravelAuth && isAuthenticated) {
+    if (!isAuthenticated) {
+      setFollowed(new Set())
+      return
+    }
+    if (laravelAuth) {
       authorFollowsApi
         .listIds()
         .then(res => setFollowed(new Set((res.data ?? []).map(String))))
@@ -82,6 +89,7 @@ function AuthorsContent() {
   }, [laravelAuth, isAuthenticated])
 
   async function toggleFollow(id: string) {
+    if (!ensureSignedInForAuthorFollow(router, isAuthenticated, "/authors")) return
     const willFollow = !followed.has(id)
     if (laravelAuth && isAuthenticated) {
       setBusyId(id)

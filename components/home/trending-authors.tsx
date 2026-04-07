@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { TRENDING_AUTHORS } from "@/lib/mock-data"
 import { apiUrlConfigured, laravelAuthEnabled } from "@/lib/auth-mode"
 import { authorsApi, authorFollowsApi } from "@/lib/api"
@@ -9,6 +10,7 @@ import {
   loadAuthorFollowIdsFromStorage,
   saveAuthorFollowIdsToStorage,
   formatAuthorFollowerCount,
+  ensureSignedInForAuthorFollow,
 } from "@/lib/author-follows-client"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Users, BookOpen, CheckCircle2, ArrowRight } from "lucide-react"
@@ -25,6 +27,7 @@ type AuthorRow = {
 }
 
 export function TrendingAuthors() {
+  const router = useRouter()
   const { isAuthenticated } = useAuth()
   const laravel = laravelAuthEnabled()
   const hasApi = apiUrlConfigured()
@@ -43,7 +46,11 @@ export function TrendingAuthors() {
   }, [hasApi])
 
   React.useEffect(() => {
-    if (laravel && isAuthenticated) {
+    if (!isAuthenticated) {
+      setFollowed(new Set())
+      return
+    }
+    if (laravel) {
       authorFollowsApi
         .listIds()
         .then(res => setFollowed(new Set((res.data ?? []).map(String))))
@@ -54,6 +61,7 @@ export function TrendingAuthors() {
   }, [laravel, isAuthenticated])
 
   async function toggleFollow(authorId: string) {
+    if (!ensureSignedInForAuthorFollow(router, isAuthenticated, "/")) return
     const willFollow = !followed.has(authorId)
 
     if (laravel && isAuthenticated) {
