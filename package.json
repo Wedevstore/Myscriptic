@@ -13,7 +13,6 @@
     "eslint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "dependencies": {
-    "@react-oauth/google": "^0.12.1",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -25,12 +24,14 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@react-oauth/google": "^0.12.1",
     "@vimeo/player": "^2.30.3",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "lucide-react": "^0.400.0",
     "next": "latest",
+    "otplib": "^13.4.0",
     "react": "latest",
     "react-dom": "^19.0.0",
     "recharts": "latest",

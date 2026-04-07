@@ -22,6 +22,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState(stored)
   }, [])
 
+  /** Profile → Preferences stores `myscriptic-locale`; keep `<html lang>` in sync on load. */
+  React.useEffect(() => {
+    const allowed = new Set(["en", "fr", "yo", "ig", "ha", "sw"])
+    const loc = localStorage.getItem("myscriptic-locale")
+    if (loc && allowed.has(loc)) {
+      document.documentElement.lang = loc
+    }
+  }, [])
+
   // Apply class to <html>
   React.useEffect(() => {
     const root = window.document.documentElement

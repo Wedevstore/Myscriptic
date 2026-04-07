@@ -86,6 +86,66 @@ async function request<T>(
   return JSON.parse(text) as T
 }
 
+/** Password login may return a token immediately or a 2FA `pending_token` (no Bearer yet). */
+export type LoginPasswordOutcome =
+  | { kind: "success"; token: string; user: unknown }
+  | { kind: "two_factor"; pendingToken: string }
+  | { kind: "error"; message: string }
+
+/**
+ * POST /api/auth/login — handles Laravel 2FA: JSON with `pending_token` and no `token`.
+ * Does not send Authorization (pre-auth).
+ */
+export async function loginWithPassword(
+  email: string,
+  password: string
+): Promise<LoginPasswordOutcome> {
+  const res = await fetch(`${BASE_URL}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  })
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok) {
+    return { kind: "error", message: messageFromErrorPayload(data, res.statusText) }
+  }
+
+  const ptRaw = data.pending_token ?? data.pendingToken
+  const pendingToken =
+    ptRaw != null && String(ptRaw).length > 0 ? String(ptRaw) : null
+
+  const hasToken = data.token != null && String(data.token).length > 0
+  const hasUser = data.user != null
+
+  if (hasToken && hasUser) {
+    return { kind: "success", token: String(data.token), user: data.user }
+  }
+  if (pendingToken) {
+    return { kind: "two_factor", pendingToken }
+  }
+
+  const explicit2fa =
+    data.two_factor_required === true ||
+    data.requires_two_factor === true ||
+    data.two_factor === true
+  if (explicit2fa) {
+    return {
+      kind: "error",
+      message:
+        "Two-factor authentication is required, but the server did not return a pending token.",
+    }
+  }
+
+  const msg = typeof data.message === "string" ? data.message : ""
+  return {
+    kind: "error",
+    message: msg && msg.length > 0 ? msg : "Login failed.",
+  }
+}
+
 /** CSV/stream download with Bearer token (admin export endpoints). */
 async function downloadAuthenticatedFile(path: string, defaultFilename: string): Promise<void> {
   const token = getToken()
@@ -194,6 +254,39 @@ export const authApi = {
         ...(nonce ? { nonce } : {}),
         ...(userJson ? { user: userJson } : {}),
       }),
+    }),
+
+  /**
+   * Complete login after password step returned `pending_token`.
+   * Laravel: POST /api/auth/2fa/verify — body uses snake_case.
+   */
+  twoFactorVerify: (body: { pending_token: string; code: string }) =>
+    request<{ token: string; user: unknown }>("/auth/2fa/verify", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /** Authenticated: begin TOTP enrollment (server-generated secret / URI). */
+  twoFactorSetup: () =>
+    request<{
+      secret?: string
+      otpauth_uri?: string
+      otpauthUrl?: string
+      qr_svg?: string
+    }>("/auth/2fa/setup", { method: "POST", body: JSON.stringify({}) }),
+
+  /** Authenticated: confirm enrollment with a valid TOTP code. */
+  twoFactorConfirm: (code: string) =>
+    request<{ user?: unknown; data?: unknown }>("/auth/2fa/confirm", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
+  /** Authenticated: disable 2FA (send `password` too if your API requires it). */
+  twoFactorDisable: (body: { code: string; password?: string }) =>
+    request<{ user?: unknown; data?: unknown }>("/auth/2fa/disable", {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 }
 

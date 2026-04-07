@@ -74,6 +74,25 @@ php artisan config:cache
 
 The Next client stores a token and uses **Bearer** headers. Ensure Laravel issues tokens the way `auth-provider` / login flows expect (Sanctum personal access tokens or equivalent). If you switch to **cookie + CSRF** SPA mode, you must also change the frontend `fetch` calls (e.g. `credentials: 'include'`)—the current client is built for **Bearer** JSON APIs.
 
+### Two-factor authentication (2FA)
+
+There is **no** separate `NEXT_PUBLIC_*` flag for 2FA on the frontend. When Laravel auth is enabled, the app uses the same API base and:
+
+1. **Login** — `POST /api/auth/login` may return JSON with a **`pending_token`** and no **`token`**. The login screen then collects a TOTP code and calls **`POST /api/auth/2fa/verify`** with `{ "pending_token", "code" }` to receive `{ token, user }`.
+2. **Profile** — Authenticated users use **`POST /api/auth/2fa/setup`**, **`POST /api/auth/2fa/confirm`**, and **`POST /api/auth/2fa/disable`** (see `lib/api.ts` for bodies). Adjust route names in Laravel to match, or adapt the client if your API uses different paths under `/api/auth/2fa/*`.
+
+On the server, run **`php artisan migrate`** so user 2FA columns (and any related tables) exist before enabling 2FA in production.
+
+### Live payments and non-mock API
+
+Payment behaviour is controlled **on Laravel** (gateway keys, `site-config` / `mock_flow: false`, etc.), not by a Next.js env flag. To run real charges:
+
+1. Add production **payment provider** secrets in Laravel `.env` (Paystack, Flutterwave, PayPal, Korapay, etc., as implemented on the API).
+2. Optionally configure **SMTP** (transactional email) and **S3** (or your storage driver) on Laravel.
+3. Run **`php artisan config:clear`** then **`php artisan config:cache`** so the API picks up env and cached config.
+
+The Next app only calls JSON endpoints such as **`POST /api/subscription/checkout`**; it does not simulate payments when the API returns a real `payment_url`.
+
 ---
 
 ## 2. Vercel (GitHub deploy)

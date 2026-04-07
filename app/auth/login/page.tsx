@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { safeInternalPath } from "@/lib/safe-internal-path"
@@ -15,10 +16,10 @@ import {
   Eye, EyeOff, Mail, Lock, AlertCircle, Loader2, ArrowLeft,
 } from "lucide-react"
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { login, isAuthenticated } = useAuth()
+  const { login, verifyLoginTwoFactor, isAuthenticated } = useAuth()
   const afterLogin = safeInternalPath(searchParams.get("next") ?? searchParams.get("redirect"))
 
   const goAfterLogin = React.useCallback(() => {
@@ -37,8 +38,10 @@ export default function LoginPage() {
   const [showPw, setShowPw] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState("")
+  const [step, setStep] = React.useState<"password" | "2fa">("password")
+  const [pendingToken, setPendingToken] = React.useState<string | null>(null)
+  const [twoFactorCode, setTwoFactorCode] = React.useState("")
 
-  // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) router.replace(afterLogin)
   }, [isAuthenticated, router, afterLogin])
@@ -50,19 +53,50 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.email || !form.password) { setError("Please fill in all fields."); return }
+    if (!form.email || !form.password) {
+      setError("Please fill in all fields.")
+      return
+    }
     setLoading(true)
     const result = await login(form.email, form.password)
     setLoading(false)
-    if (!result.success) setError(result.error ?? "Login failed.")
-    else goAfterLogin()
+    if (result.success) {
+      goAfterLogin()
+    } else if ("needsTwoFactor" in result && result.needsTwoFactor) {
+      setPendingToken(result.pendingToken)
+      setStep("2fa")
+      setTwoFactorCode("")
+      setError("")
+    } else {
+      setError((result as { success: false; error?: string }).error ?? "Login failed.")
+    }
+  }
+
+  const handle2faSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const clean = twoFactorCode.replace(/\s/g, "")
+    if (!pendingToken || clean.length !== 6) {
+      setError("Enter the 6-digit code from your authenticator app.")
+      return
+    }
+    setLoading(true)
+    setError("")
+    const r = await verifyLoginTwoFactor(pendingToken, clean)
+    setLoading(false)
+    if (r.success) goAfterLogin()
+    else setError(r.error ?? "Invalid code.")
+  }
+
+  const backToPassword = () => {
+    setStep("password")
+    setPendingToken(null)
+    setTwoFactorCode("")
+    setError("")
   }
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Panel — Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-sidebar flex-col justify-between p-12 relative overflow-hidden">
-        {/* Decorative book stack */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute top-20 left-10 w-32 h-44 bg-brand rounded-sm rotate-[-8deg]" />
           <div className="absolute top-28 left-20 w-28 h-40 bg-accent-sky rounded-sm rotate-[3deg]" />
@@ -102,7 +136,6 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* Right Panel — Form */}
       <div className="flex-1 flex items-center justify-center p-6 bg-background">
         <div className="w-full max-w-md">
           <Link
@@ -113,8 +146,14 @@ export default function LoginPage() {
           </Link>
 
           <div className="mb-8">
-            <h2 className="font-serif text-3xl font-bold text-foreground mb-1">Welcome back</h2>
-            <p className="text-muted-foreground">Sign in to continue reading</p>
+            <h2 className="font-serif text-3xl font-bold text-foreground mb-1">
+              {step === "2fa" ? "Two-factor authentication" : "Welcome back"}
+            </h2>
+            <p className="text-muted-foreground">
+              {step === "2fa"
+                ? "Enter the code from your authenticator app to finish signing in."
+                : "Sign in to continue reading"}
+            </p>
           </div>
 
           {error && (
@@ -124,86 +163,147 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email address</Label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          {step === "password" ? (
+            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email address</Label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={handleChange}
+                    className="pl-9"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link href={forgotHref} className="text-xs text-brand hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPw ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={form.password}
+                    onChange={handleChange}
+                    className="pl-9 pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPw ? "Hide password" : "Show password"}
+                  >
+                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-brand hover:bg-brand-dark text-primary-foreground font-semibold h-11"
+              >
+                {loading ? (
+                  <><Loader2 size={16} className="mr-2 animate-spin" /> Signing in...</>
+                ) : (
+                  "Sign in"
+                )}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handle2faSubmit} className="space-y-5" noValidate>
+              <div className="space-y-1.5">
+                <Label htmlFor="twofa-code">Authenticator code</Label>
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={form.email}
-                  onChange={handleChange}
-                  className="pl-9"
-                  required
+                  id="twofa-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={8}
+                  placeholder="000000"
+                  value={twoFactorCode}
+                  onChange={e =>
+                    setTwoFactorCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  className="font-mono tracking-widest text-center text-lg"
+                  autoFocus
                 />
               </div>
-            </div>
+              <Button
+                type="submit"
+                disabled={loading || twoFactorCode.replace(/\s/g, "").length !== 6}
+                className="w-full bg-brand hover:bg-brand-dark text-primary-foreground font-semibold h-11"
+              >
+                {loading ? (
+                  <><Loader2 size={16} className="mr-2 animate-spin" /> Verifying...</>
+                ) : (
+                  "Verify and continue"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                disabled={loading}
+                onClick={backToPassword}
+              >
+                Use a different account
+              </Button>
+            </form>
+          )}
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link href={forgotHref} className="text-xs text-brand hover:underline">
-                  Forgot password?
-                </Link>
+          {step === "password" && (
+            <>
+              <div className="relative my-6">
+                <Separator />
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
+                  or continue with
+                </span>
               </div>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPw ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  value={form.password}
-                  onChange={handleChange}
-                  className="pl-9 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(p => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label={showPw ? "Hide password" : "Show password"}
-                >
-                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-brand hover:bg-brand-dark text-primary-foreground font-semibold h-11"
-            >
-              {loading ? (
-                <><Loader2 size={16} className="mr-2 animate-spin" /> Signing in...</>
-              ) : (
-                "Sign in"
-              )}
-            </Button>
-          </form>
+              <SocialLoginButtons disabled={loading} onSocialSuccess={goAfterLogin} />
+            </>
+          )}
 
-          <div className="relative my-6">
-            <Separator />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
-              or continue with
-            </span>
-          </div>
-
-          <SocialLoginButtons disabled={loading} onSocialSuccess={goAfterLogin} />
-
-          <p className="text-center text-sm text-muted-foreground mt-8">
-            Don&apos;t have an account?{" "}
-            <Link href={registerHref} className="text-brand hover:underline font-medium">
-              Create one free
-            </Link>
-          </p>
+          {step === "password" && (
+            <p className="text-center text-sm text-muted-foreground mt-8">
+              Don&apos;t have an account?{" "}
+              <Link href={registerHref} className="text-brand hover:underline font-medium">
+                Create one free
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-brand" aria-label="Loading" />
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   )
 }

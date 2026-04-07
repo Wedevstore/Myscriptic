@@ -15,23 +15,49 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useTheme } from "@/components/providers/theme-provider"
-import { authApi } from "@/lib/api"
-import { apiUrlConfigured, laravelAuthEnabled } from "@/lib/auth-mode"
+import { authApi, subscriptionsApi } from "@/lib/api"
+import { apiUrlConfigured, laravelAuthEnabled, laravelPhase3Enabled } from "@/lib/auth-mode"
+import { subscriptionStore } from "@/lib/store"
 import { normalizeAuthUser } from "@/components/providers/auth-provider"
 import {
-  User, Mail, Lock, Bell, Moon, Sun, Shield,
+  User, Mail, Lock, Bell, Moon, Sun,
   CheckCircle, CreditCard, Globe, Trash2, Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { TwoFactorCard } from "@/components/profile/two-factor-card"
+
+const LOCALE_STORAGE_KEY = "myscriptic-locale"
+
+const APP_LOCALES = [
+  { value: "en", label: "English" },
+  { value: "fr", label: "Français" },
+  { value: "yo", label: "Yoruba" },
+  { value: "ig", label: "Igbo" },
+  { value: "ha", label: "Hausa" },
+  { value: "sw", label: "Swahili" },
+] as const
+
+type AppLocale = (typeof APP_LOCALES)[number]["value"]
+
+function isAppLocale(s: string): s is AppLocale {
+  return APP_LOCALES.some(l => l.value === s)
+}
 
 function ProfileContent() {
   const { user, isAuthenticated, isLoading, updateUser, logout } = useAuth()
-  const { resolvedTheme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const router = useRouter()
 
   const [nameVal, setNameVal] = React.useState(user?.name ?? "")
   const [saved, setSaved] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
+  const [locale, setLocale] = React.useState<AppLocale>("en")
+  const [preferencesSaved, setPreferencesSaved] = React.useState(false)
+  const [subscriptionActionLoading, setSubscriptionActionLoading] = React.useState(false)
+  const [subscriptionActionMessage, setSubscriptionActionMessage] = React.useState<{
+    type: "success" | "error"
+    text: string
+  } | null>(null)
 
   // Notification preferences (local state)
   const [notifPrefs, setNotifPrefs] = React.useState({
@@ -49,6 +75,94 @@ function ProfileContent() {
   React.useEffect(() => {
     if (user) setNameVal(user.name)
   }, [user])
+
+  React.useEffect(() => {
+    const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
+    const next: AppLocale = stored && isAppLocale(stored) ? stored : "en"
+    setLocale(next)
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = next
+    }
+  }, [])
+
+  const handleSavePreferences = () => {
+    const next: AppLocale = isAppLocale(locale) ? locale : "en"
+    localStorage.setItem(LOCALE_STORAGE_KEY, next)
+    document.documentElement.lang = next
+    setLocale(next)
+    setPreferencesSaved(true)
+    window.setTimeout(() => setPreferencesSaved(false), 2500)
+  }
+
+  async function syncSubscriptionFromApi(): Promise<void> {
+    if (!laravelPhase3Enabled() || !apiUrlConfigured()) return
+    try {
+      const s = await subscriptionsApi.status()
+      if (s.active && s.expires_at && s.plan) {
+        updateUser({
+          subscriptionPlan:      s.plan.name,
+          subscriptionExpiresAt: s.expires_at,
+        })
+      } else {
+        updateUser({ subscriptionPlan: null, subscriptionExpiresAt: null })
+      }
+    } catch {
+      try {
+        const me = await authApi.me()
+        updateUser(normalizeAuthUser(me.user))
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  const handleChangePlan = () => {
+    setSubscriptionActionMessage(null)
+    router.push("/subscription?change=1")
+  }
+
+  const handleCancelSubscription = async () => {
+    if (!user) return
+    setSubscriptionActionMessage(null)
+    const ok = window.confirm(
+      "Cancel your subscription? You may keep access until the end of the current billing period, depending on your plan."
+    )
+    if (!ok) return
+    setSubscriptionActionLoading(true)
+    try {
+      if (laravelPhase3Enabled() && apiUrlConfigured() && laravelAuthEnabled()) {
+        await subscriptionsApi.cancel()
+        await syncSubscriptionFromApi()
+        setSubscriptionActionMessage({
+          type: "success",
+          text: "Your subscription was updated. If you still have access until a future date, it will show above.",
+        })
+      } else {
+        const sub = subscriptionStore.getActiveByUser(user.id)
+        if (!sub) {
+          updateUser({ subscriptionPlan: null, subscriptionExpiresAt: null })
+          setSubscriptionActionMessage({
+            type: "success",
+            text: "Local subscription state cleared.",
+          })
+          return
+        }
+        subscriptionStore.cancel(sub.id, user.id)
+        updateUser({ subscriptionPlan: null, subscriptionExpiresAt: null })
+        setSubscriptionActionMessage({
+          type: "success",
+          text: "Subscription cancelled (demo).",
+        })
+      }
+    } catch (e) {
+      setSubscriptionActionMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Could not cancel subscription. Try again.",
+      })
+    } finally {
+      setSubscriptionActionLoading(false)
+    }
+  }
 
   const handleSaveProfile = async () => {
     if (!user) return
@@ -210,17 +324,7 @@ function ProfileContent() {
 
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-3">Two-Factor Authentication</h3>
-                <div className="flex items-start justify-between gap-4 p-4 bg-muted rounded-xl">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Authenticator App</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Add an extra layer of security to your account with TOTP.
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" className="shrink-0 gap-2">
-                    <Shield size={13} /> Enable 2FA
-                  </Button>
-                </div>
+                <TwoFactorCard user={user} updateUser={updateUser} />
               </div>
 
               <Separator />
@@ -294,6 +398,18 @@ function ProfileContent() {
 
             {user.subscriptionPlan ? (
               <div className="space-y-4">
+                {subscriptionActionMessage && (
+                  <Alert
+                    variant={subscriptionActionMessage.type === "error" ? "destructive" : "default"}
+                    className={
+                      subscriptionActionMessage.type === "success"
+                        ? "border-green-200 bg-green-50 text-green-900 dark:border-green-800/50 dark:bg-green-900/20 dark:text-green-200"
+                        : undefined
+                    }
+                  >
+                    <AlertDescription>{subscriptionActionMessage.text}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="flex items-start justify-between gap-4 p-5 bg-brand/5 border border-brand/20 rounded-xl">
                   <div>
                     <p className="font-semibold text-foreground">{user.subscriptionPlan}</p>
@@ -306,8 +422,30 @@ function ProfileContent() {
                   <Badge className="bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-0">Active</Badge>
                 </div>
                 <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1 hover:border-brand hover:text-brand">Change Plan</Button>
-                  <Button variant="outline" className="flex-1 hover:border-destructive hover:text-destructive">Cancel Plan</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 hover:border-brand hover:text-brand"
+                    onClick={handleChangePlan}
+                    disabled={subscriptionActionLoading}
+                  >
+                    Change Plan
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 hover:border-destructive hover:text-destructive"
+                    onClick={handleCancelSubscription}
+                    disabled={subscriptionActionLoading}
+                  >
+                    {subscriptionActionLoading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 size={14} className="animate-spin" /> Working…
+                      </span>
+                    ) : (
+                      "Cancel Plan"
+                    )}
+                  </Button>
                 </div>
               </div>
             ) : (
@@ -339,10 +477,11 @@ function ProfileContent() {
                 ].map(t => (
                   <button
                     key={t.value}
+                    type="button"
                     onClick={() => setTheme(t.value as "light" | "dark" | "system")}
                     className={cn(
                       "flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border transition-all",
-                      resolvedTheme === t.value || (t.value === "system")
+                      theme === t.value
                         ? "border-brand bg-brand/5 text-brand"
                         : "border-border text-muted-foreground hover:border-brand/30"
                     )}
@@ -358,18 +497,39 @@ function ProfileContent() {
 
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-3">Language</h3>
-              <select className="w-full max-w-xs h-10 px-3 rounded-lg border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                <option value="en">English</option>
-                <option value="fr">Français</option>
-                <option value="yo">Yoruba</option>
-                <option value="ig">Igbo</option>
-                <option value="ha">Hausa</option>
-                <option value="sw">Swahili</option>
+              <p className="text-xs text-muted-foreground mb-2 max-w-md">
+                Applies the site language preference for this browser. Theme changes above are saved as soon as you tap an option.
+              </p>
+              <select
+                value={locale}
+                onChange={e => {
+                  const v = e.target.value
+                  setLocale(isAppLocale(v) ? v : "en")
+                }}
+                className="w-full max-w-xs h-10 px-3 rounded-lg border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Interface language"
+              >
+                {APP_LOCALES.map(l => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
               </select>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-border">
-              <Button className="bg-brand hover:bg-brand-dark text-primary-foreground">Save Preferences</Button>
+            <div className="flex justify-end items-center gap-3 pt-2 border-t border-border">
+              {preferencesSaved && (
+                <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5 shrink-0">
+                  <CheckCircle size={14} aria-hidden /> Preferences saved
+                </span>
+              )}
+              <Button
+                type="button"
+                className="bg-brand hover:bg-brand-dark text-primary-foreground"
+                onClick={handleSavePreferences}
+              >
+                Save Preferences
+              </Button>
             </div>
           </div>
         </TabsContent>

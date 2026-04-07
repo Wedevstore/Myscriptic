@@ -327,14 +327,19 @@ function PlanCard({
   plan,
   activePlanId,
   onSubscribe,
+  allowPlanSwitch,
 }: {
   plan: SubscriptionPlan
   /** When set, the matching card is the subscriber's current plan. */
   activePlanId: string | null
   onSubscribe: (plan: SubscriptionPlan) => void
+  /** From `/subscription?change=1` — show checkout for a different plan (Laravel Phase 3). */
+  allowPlanSwitch: boolean
 }) {
   const isCurrentPlan = activePlanId !== null && plan.id === activePlanId
   const hasOtherPlan  = activePlanId !== null && plan.id !== activePlanId
+  const canSwitchLaravel =
+    allowPlanSwitch && laravelPhase3Enabled() && /^\d+$/.test(String(plan.id))
   return (
     <div
       className={cn(
@@ -383,9 +388,19 @@ function PlanCard({
         <div className="flex items-center justify-center gap-2 h-12 rounded-xl bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 font-semibold text-sm">
           <CheckCircle size={15} /> Your current plan
         </div>
+      ) : hasOtherPlan && canSwitchLaravel ? (
+        <Button
+          onClick={() => onSubscribe(plan)}
+          variant="outline"
+          className="w-full h-12 font-semibold text-base border-brand/40 hover:border-brand hover:text-brand"
+        >
+          Switch to this plan
+        </Button>
       ) : hasOtherPlan ? (
         <div className="flex items-center justify-center gap-2 h-12 rounded-xl border border-border bg-muted/40 text-muted-foreground font-medium text-sm px-2 text-center">
-          You have another active plan — see the banner above.
+          {allowPlanSwitch && !laravelPhase3Enabled()
+            ? "Plan changes require the live API. Use production or enable Phase 3."
+            : "You have another active plan — open Change Plan from your profile or see the banner above."}
         </div>
       ) : (
         <Button
@@ -548,6 +563,8 @@ function SubscriptionCheckoutReturnBanner({ onPaidReturn }: { onPaidReturn: () =
 function SubscriptionPageContent() {
   const { user, isAuthenticated, isLoading, updateUser } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const allowPlanSwitch = searchParams.get("change") === "1"
   const [plans, setPlans]             = React.useState<SubscriptionPlan[]>([])
   const [activeSub, setActiveSub]     = React.useState<ReturnType<typeof subscriptionStore.getActiveByUser>>(null)
   const [laravelSub, setLaravelSub]   = React.useState<{
@@ -621,6 +638,12 @@ function SubscriptionPageContent() {
       .catch(() => setLaravelSub(null))
   }, [user, refreshKey, updateUser])
 
+  React.useEffect(() => {
+    if (!allowPlanSwitch || typeof document === "undefined") return
+    const el = document.getElementById("subscription-plans")
+    el?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [allowPlanSwitch, plans.length])
+
   function handleSubscribe(plan: SubscriptionPlan) {
     if (!isAuthenticated) {
       router.push(`/auth/login?next=${encodeURIComponent("/subscription")}`)
@@ -679,7 +702,11 @@ function SubscriptionPageContent() {
             : null)}
 
         {/* Plans */}
-        <section className="py-14 bg-background" aria-label="Subscription plan options">
+        <section
+          id="subscription-plans"
+          className="py-14 bg-background scroll-mt-24"
+          aria-label="Subscription plan options"
+        >
           <div className="max-w-4xl mx-auto px-4 sm:px-6">
             {!isAuthenticated && (
               <div className="mb-6 flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl text-sm text-amber-800 dark:text-amber-300">
@@ -697,6 +724,11 @@ function SubscriptionPageContent() {
                 </span>
               </div>
             )}
+            {allowPlanSwitch && laravelPhase3Enabled() && activePlanId && (
+              <p className="mb-6 text-sm text-muted-foreground rounded-xl border border-border bg-muted/30 px-4 py-3">
+                You&apos;re switching plans. Pick a new billing option below — you&apos;ll complete payment on your provider&apos;s page.
+              </p>
+            )}
             <div className="grid md:grid-cols-2 gap-8">
               {plans.map(plan => (
                 <PlanCard
@@ -704,6 +736,7 @@ function SubscriptionPageContent() {
                   plan={plan}
                   activePlanId={activePlanId}
                   onSubscribe={handleSubscribe}
+                  allowPlanSwitch={allowPlanSwitch}
                 />
               ))}
             </div>
@@ -766,7 +799,19 @@ function SubscriptionPageContent() {
 export default function SubscriptionPage() {
   return (
     <Providers>
-      <SubscriptionPageContent />
+      <React.Suspense
+        fallback={
+          <div className="flex min-h-screen flex-col">
+            <Navbar />
+            <main className="flex flex-1 items-center justify-center pt-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+            </main>
+            <Footer />
+          </div>
+        }
+      >
+        <SubscriptionPageContent />
+      </React.Suspense>
     </Providers>
   )
 }

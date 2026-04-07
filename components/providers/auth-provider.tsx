@@ -15,7 +15,7 @@
  */
 
 import * as React from "react"
-import { authApi } from "@/lib/api"
+import { authApi, loginWithPassword } from "@/lib/api"
 import { mergeLocalCartToServer } from "@/lib/cart-actions"
 import { laravelAuthEnabled } from "@/lib/auth-mode"
 
@@ -30,6 +30,8 @@ export interface AuthUser {
   subscriptionPlan?: string | null
   subscriptionExpiresAt?: string | null
   createdAt: string
+  /** Client + optional API: authenticator app enrolled (secret stored separately per device). */
+  twoFactorEnabled?: boolean
 }
 
 interface AuthState {
@@ -39,8 +41,18 @@ interface AuthState {
   isAuthenticated: boolean
 }
 
+/** Laravel may require a second step: POST /api/auth/2fa/verify with `pending_token`. */
+export type LoginResult =
+  | { success: true }
+  | { success: false; error?: string }
+  | { success: false; needsTwoFactor: true; pendingToken: string }
+
 interface AuthContextValue extends AuthState {
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<LoginResult>
+  verifyLoginTwoFactor: (
+    pendingToken: string,
+    code: string
+  ) => Promise<{ success: boolean; error?: string }>
   register: (name: string, email: string, password: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>
   loginWithGoogleCredential: (credential: string) => Promise<{ success: boolean; error?: string }>
   loginWithApple: (identityToken: string, nonce?: string, userJson?: string) => Promise<{ success: boolean; error?: string }>
@@ -141,6 +153,8 @@ function findMockUser(email: string, password: string) {
 
 export function normalizeAuthUser(raw: unknown): AuthUser {
   const u = raw as Record<string, unknown>
+  const twoFactorEnabled =
+    u.two_factor_enabled === true || u.twoFactorEnabled === true ? true : undefined
   return {
     id: String(u.id),
     name: String(u.name),
@@ -154,6 +168,7 @@ export function normalizeAuthUser(raw: unknown): AuthUser {
         ? (u.subscriptionExpiresAt as string | null)
         : undefined,
     createdAt: String(u.createdAt),
+    twoFactorEnabled,
   }
 }
 
@@ -174,13 +189,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = React.useCallback(
-    async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    async (email: string, password: string): Promise<LoginResult> => {
       if (laravel) {
+        const out = await loginWithPassword(email, password)
+        if (out.kind === "error") {
+          return { success: false, error: out.message }
+        }
+        if (out.kind === "two_factor") {
+          return { success: false, needsTwoFactor: true, pendingToken: out.pendingToken }
+        }
         try {
-          const res = await authApi.login(email, password)
-          const user = normalizeAuthUser(res.user)
-          saveToStorage(user, res.token)
-          setState({ user, token: res.token, isLoading: false, isAuthenticated: true })
+          const user = normalizeAuthUser(out.user)
+          saveToStorage(user, out.token)
+          setState({ user, token: out.token, isLoading: false, isAuthenticated: true })
           await mergeLocalCartToServer()
           return { success: true }
         } catch (e) {
@@ -200,6 +221,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveToStorage(user, token)
       setState({ user, token, isLoading: false, isAuthenticated: true })
       return { success: true }
+    },
+    [laravel]
+  )
+
+  const verifyLoginTwoFactor = React.useCallback(
+    async (
+      pendingToken: string,
+      code: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      if (!laravel) {
+        return { success: false, error: "Two-factor sign-in requires the Laravel API." }
+      }
+      try {
+        const res = await authApi.twoFactorVerify({
+          pending_token: pendingToken,
+          code: code.replace(/\s/g, ""),
+        })
+        const user = normalizeAuthUser(res.user)
+        saveToStorage(user, res.token)
+        setState({ user, token: res.token, isLoading: false, isAuthenticated: true })
+        await mergeLocalCartToServer()
+        return { success: true }
+      } catch (e) {
+        return {
+          success: false,
+          error: e instanceof Error ? e.message : "Invalid or expired code.",
+        }
+      }
     },
     [laravel]
   )
@@ -333,6 +382,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         ...state,
         login,
+        verifyLoginTwoFactor,
         register,
         loginWithGoogleCredential,
         loginWithApple,
