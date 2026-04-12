@@ -498,3 +498,4 @@ Author uploads use the same upload flow for EPUB and PDF (`book_file_s3_key`); p
 | 2026-04-12 | Seed functions disabled in prod | `lib/store.ts`, `lib/store-p4.ts`, `lib/author-courses-store.ts` | No backend change — mock data no longer seeded in production |
 | 2026-04-12 | CSP tightened | `next.config.js` | No backend change — removed `unsafe-eval` from Content-Security-Policy |
 | 2026-04-12 | Error reporting facade | `lib/error-reporting.ts`, `app/error.tsx`, `app/global-error.tsx` | No backend change — structured error logging for Vercel log drain |
+| 2026-04-12 | Footer newsletter wired to API | `components/layout/footer-newsletter.tsx` | Ensure `POST /newsletter/subscribe` stores email + sends confirmation |

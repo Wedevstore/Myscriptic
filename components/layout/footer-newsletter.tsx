@@ -1,17 +1,29 @@
 "use client"
 
 import * as React from "react"
-import { Mail, ArrowRight } from "lucide-react"
+import { Mail, ArrowRight, Loader2 } from "lucide-react"
 
 export function FooterNewsletter() {
   const [email, setEmail] = React.useState("")
   const [done, setDone] = React.useState(false)
+  const [loading, setLoading] = React.useState(false)
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     const v = email.trim()
     if (!v || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return
-    // No backend list yet — acknowledge locally; swap for POST /api/newsletter when ready
+    setLoading(true)
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
+      if (apiUrl) {
+        await fetch(`${apiUrl.replace(/\/+$/, "")}/api/newsletter/subscribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ email: v }),
+        })
+      }
+    } catch { /* best-effort */ }
+    setLoading(false)
     setDone(true)
   }
 
@@ -40,10 +52,11 @@ export function FooterNewsletter() {
       </div>
       <button
         type="submit"
-        className="w-10 h-10 bg-brand hover:bg-brand-dark text-primary-foreground rounded-xl flex items-center justify-center transition-colors shrink-0 shadow-sm"
+        disabled={loading}
+        className="w-10 h-10 bg-brand hover:bg-brand-dark text-primary-foreground rounded-xl flex items-center justify-center transition-colors shrink-0 shadow-sm disabled:opacity-50"
         aria-label="Subscribe to newsletter"
       >
-        <ArrowRight size={15} />
+        {loading ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />}
       </button>
     </form>
   )
