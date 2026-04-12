@@ -75,8 +75,22 @@ server {
 
 ## Next.js
 
-- **Vercel**: connect the repo root, set env vars, build command `npm run build`, output `.next`.
-- **VPS**: `npm ci && npm run build && npm run start` (or PM2). Put Nginx in front with SSL; proxy to port 3000.
+### Vercel — deploy only from GitHub (canonical)
+
+Production and preview deployments should come from **Vercel’s Git integration**, not from uploading a local tree with the CLI.
+
+1. In [Vercel](https://vercel.com) → your project (**e.g. `wedevstore/myscriptic`**) → **Settings → Git**:
+   - **Connected Git Repository:** `Wedevstore/Myscriptic` (or the correct org/repo).
+   - **Production Branch:** `main`.
+2. **Push to `main`** → Vercel runs **Production** build + deploy automatically.
+3. **Pull requests** → **Preview** deployments (unique URL per PR).
+
+**Do not** use `vercel deploy --prod` (or `vercel --prod`) for normal releases: it uploads whatever is on disk, can omit commits that exist only on GitHub, and bypasses the same commit CI ran against. Reserve CLI production deploys for rare emergencies, and prefer **Deployments → … → Redeploy** from an existing Git-based deployment when possible.
+
+Local **`.vercel/`** (from `vercel link`) is for `vercel env pull` / previews; it does not change the rule above.
+
+- **Vercel project setup:** connect the **repo root**, set env vars, install/build command `npm ci` + `npm run build`, framework Next.js, output `.next`.
+- **VPS (alternative):** `npm ci && npm run build && npm run start` (or PM2). Put Nginx in front with SSL; proxy to port 3000.
 
 ## Redis
 

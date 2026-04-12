@@ -43,7 +43,7 @@ To learn more about Next.js, take a look at the following resources:
 
 ## Deploy
 
-The frontend is designed to deploy on **[Vercel](https://vercel.com)** from GitHub. The Laravel API can live anywhere with HTTPS (e.g. **`api.myscriptic.com`** on **CyberPanel** with **PostgreSQL**).
+The frontend is designed to deploy on **[Vercel](https://vercel.com)** with **GitHub as the source of truth**: connect the repo under **Vercel → Settings → Git**, set **Production Branch** to **`main`**, then **push to `main`** to ship production. Avoid routine `vercel --prod` from your laptop (see [DEPLOYMENT.md](DEPLOYMENT.md#nextjs)). The Laravel API can live anywhere with HTTPS (e.g. **`api.myscriptic.com`** on **CyberPanel** with **PostgreSQL**).
 
 - **Wire Vercel ↔ Laravel ↔ DB:** [docs/production-api-vercel-cyberpanel.md](docs/production-api-vercel-cyberpanel.md)
 - **Next.js:** copy [`.env.example`](.env.example) to `.env.local` — `NEXT_PUBLIC_API_URL` is the **API origin only** (e.g. `https://api.myscriptic.com`); the app appends `/api` for Laravel routes. Set **`NEXT_PUBLIC_SITE_URL`** to the canonical site (**`https://www.myscriptic.com`** in production, **`http://localhost:3000`** locally; Vercel Preview often uses **`https://myscriptic.vercel.app`**).
