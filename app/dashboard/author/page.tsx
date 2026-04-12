@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { booksApi, authorSalesApi, authorSubscriptionPoolApi } from "@/lib/api"
+import { normalizeAuthorMyBooksList } from "@/lib/author-my-books"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import { demoPic } from "@/lib/demo-images"
 import type { BookCardData } from "@/components/books/book-card"
@@ -87,12 +88,15 @@ function mineRecordToDashboardBook(
   earningsByBook: Record<string, number>,
 ): DashboardBook {
   const id = String(b.id ?? "")
-  const cover =
-    typeof b.coverUrl === "string" && b.coverUrl.trim() ? b.coverUrl : demoPic("fallback-cover")
+  const coverRaw =
+    (typeof b.coverUrl === "string" && b.coverUrl.trim() ? b.coverUrl : null) ??
+    (typeof b.cover_url === "string" && b.cover_url.trim() ? b.cover_url : null)
+  const cover = coverRaw ?? demoPic("fallback-cover")
   const fmt = typeof b.format === "string" ? b.format : "ebook"
+  const accessTypeRaw = b.accessType ?? b.access_type
   const access =
-    typeof b.accessType === "string" && (b.accessType === "PAID" || b.accessType === "SUBSCRIPTION")
-      ? b.accessType
+    typeof accessTypeRaw === "string" && (accessTypeRaw === "PAID" || accessTypeRaw === "SUBSCRIPTION")
+      ? accessTypeRaw
       : "FREE"
   const authorName =
     typeof b.author === "string" && b.author.trim()
@@ -102,12 +106,10 @@ function mineRecordToDashboardBook(
           typeof (b.author as { name?: string }).name === "string"
         ? (b.author as { name: string }).name
         : "—"
-  const rating =
-    typeof b.rating === "number" && Number.isFinite(b.rating) ? b.rating : 0
-  const reviewCount =
-    typeof b.reviewCount === "number" && Number.isFinite(b.reviewCount)
-      ? b.reviewCount
-      : 0
+  const ratingN = Number(b.rating)
+  const rating = Number.isFinite(ratingN) ? ratingN : 0
+  const reviewN = Number(b.reviewCount ?? b.review_count)
+  const reviewCount = Number.isFinite(reviewN) ? Math.max(0, Math.floor(reviewN)) : 0
 
   const { pagesRead } = parseMineEngagement(b)
 
@@ -121,7 +123,7 @@ function mineRecordToDashboardBook(
     coverUrl: cover,
     format: fmt as DashboardBook["format"],
     accessType: access as DashboardBook["accessType"],
-    status: approvalToDashboardStatus(String(b.approvalStatus ?? "")),
+    status: approvalToDashboardStatus(String(b.approvalStatus ?? b.approval_status ?? "")),
     reads: pagesRead,
     earnings: earningsByBook[id] ?? 0,
   }
@@ -194,13 +196,22 @@ function AuthorDashboardContent() {
   /** `undefined` = loading, `null` = fetch failed (use mock), else live snapshot */
   const [liveSnap, setLiveSnap] = React.useState<LiveAuthorSnapshot | null | undefined>(undefined)
 
-  const useLiveApi = Boolean(user && apiUrlConfigured() && user.role === "author")
+  const useLiveApi = Boolean(
+    user && apiUrlConfigured() && (user.role === "author" || user.role === "admin"),
+  )
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace("/auth/login?next=%2Fdashboard%2Fauthor")
     }
-    if (!isLoading && isAuthenticated && user?.role !== "author") router.replace("/")
+    if (
+      !isLoading &&
+      isAuthenticated &&
+      user?.role !== "author" &&
+      user?.role !== "admin"
+    ) {
+      router.replace("/")
+    }
   }, [isLoading, isAuthenticated, user, router])
 
   React.useEffect(() => {
@@ -232,11 +243,9 @@ function AuthorDashboardContent() {
     ])
       .then(([mineRes, salesSum, salesBooksRes, poolSum, poolPayRes]) => {
         if (!alive) return
-        const rawBooks = Array.isArray(mineRes.data) ? mineRes.data : []
+        const rawBooks = normalizeAuthorMyBooksList(mineRes)
         const earnMap = parseSalesEarningsByBook(salesBooksRes?.data)
-        const books = rawBooks
-          .filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
-          .map(row => mineRecordToDashboardBook(row, earnMap))
+        const books = rawBooks.map(row => mineRecordToDashboardBook(row, earnMap))
           .slice(0, 8)
 
         const salesNet =

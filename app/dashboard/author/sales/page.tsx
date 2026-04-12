@@ -24,6 +24,7 @@ import { seedStore, SALES_COMMISSION_PCT } from "@/lib/store"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 import { demoPic } from "@/lib/demo-images"
 import { authorSalesApi, booksApi } from "@/lib/api"
+import { normalizeAuthorMyBooksList } from "@/lib/author-my-books"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 
 // ── Mock extended sales data ─────────────────────────────────────────────────
@@ -403,19 +404,27 @@ function SalesContent() {
     ])
       .then(([mineRes, sum, salesBooks, txRes]) => {
         if (!alive) return
-        const mineRaw = Array.isArray(mineRes.data) ? mineRes.data : []
-        const mine: MineSalesBook[] = mineRaw
-          .filter((r): r is Record<string, unknown> => !!r && typeof r === "object")
-          .map(r => ({
-            id: String(r.id ?? ""),
-            title: String(r.title ?? ""),
-            author: r.author != null ? String(r.author) : null,
-            coverUrl: r.coverUrl != null ? String(r.coverUrl) : null,
-            format: r.format != null ? String(r.format) : null,
-            price: r.price != null ? Number(r.price) : null,
-            rating: r.rating != null ? Number(r.rating) : null,
-            reviewCount: r.reviewCount != null ? Number(r.reviewCount) : null,
-          }))
+        const mineRaw = normalizeAuthorMyBooksList(mineRes)
+        const mine: MineSalesBook[] = mineRaw.map(r => ({
+          id: String(r.id ?? ""),
+          title: String(r.title ?? ""),
+          author: r.author != null ? String(r.author) : null,
+          coverUrl:
+            r.coverUrl != null
+              ? String(r.coverUrl)
+              : r.cover_url != null
+                ? String(r.cover_url)
+                : null,
+          format: r.format != null ? String(r.format) : null,
+          price: r.price != null ? Number(r.price) : null,
+          rating: r.rating != null ? Number(r.rating) : null,
+          reviewCount:
+            r.reviewCount != null
+              ? Number(r.reviewCount)
+              : r.review_count != null
+                ? Number(r.review_count)
+                : null,
+        }))
         const netMap = parseNetByBookId(salesBooks?.data)
         setLiveBooks(buildLiveBookRows(mine, netMap))
 

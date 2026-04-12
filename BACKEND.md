@@ -207,7 +207,7 @@ All paths under `/api`. Auth = Laravel Sanctum Bearer token unless noted.
 | POST | `/books` | Yes | JSON (see payload below) | `{ data: Book }` |
 | PATCH | `/books/:id` | Yes | JSON partial | `{ data: Book }` |
 | DELETE | `/books/:id` | Yes | — | void |
-| GET | `/author/my-books` | Yes | query params | `{ data, meta }` |
+| GET | `/author/my-books` | Yes | query params | `{ data: Book[] \| Paginator<Book>, meta? }` — frontend accepts either a **top-level array** in `data`, or a **Laravel paginator** shape `data: { data: Book[], current_page, ... }`. Each book may be **snake_case** (`approval_status`, `access_type`, `cover_url`, `created_at`, `review_count`) or camelCase; optional JSON:API-style `{ id, attributes }` rows are flattened. |
 | POST | `/admin/books/:id/approve` | Admin | — | void |
 | POST | `/admin/books/:id/reject` | Admin | `{ reason }` | void |
 
@@ -512,3 +512,4 @@ Author uploads use the same upload flow for EPUB and PDF (`book_file_s3_key`); p
 | 2026-04-12 | Mock data gated in production | `app/page.tsx`, `app/books/`, `app/store/`, `app/reader/`, `app/audio/`, `app/library/`, `app/wishlist/`, `components/layout/navbar.tsx`, `lib/book-mapper.ts` | No backend change — frontend no longer shows mock book data when `NEXT_PUBLIC_API_URL` is set. All book content now exclusively from API/S3 in production. |
 | 2026-04-12 | Production catalog visibility | — | **Laravel (`myscriptic-api`):** run `php artisan myscriptic:publish-catalog` on the API server so pending books become `approved` and PAID books get `is_available=true`; busts book list cache. If `books` is empty: `php artisan myscriptic:publish-catalog --seed-if-empty --force`. See `Wedevstore/myscriptic-api` → `FRONTEND_SYNC.md`. Public `GET /api/books` only returns `approval_status = approved`. |
 | 2026-04-12 | Homepage when CMS book slots are empty | `app/page.tsx`, `lib/cms-homepage.ts` | **Recommended API improvement:** `GET /api/cms/homepage` should hydrate each `book_list` item with a `book` object when `book_id` is set (today slots can return `book: null`, which hid all titles on the homepage). Frontend now falls back to `store/featured` + `books` list when **zero** CMS items include a resolved `book`. |
+| 2026-04-12 | Author “my books” list parsing | `lib/author-my-books.ts`, `app/dashboard/author/page.tsx`, `app/dashboard/author/books/page.tsx`, `app/dashboard/author/sales/page.tsx`, `app/dashboard/author/earnings/page.tsx` | **No API contract change** — document that `GET /author/my-books` may return paginated `data.data` and snake_case fields; frontend now normalizes both so author dashboards populate. |

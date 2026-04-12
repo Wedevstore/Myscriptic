@@ -36,6 +36,7 @@ import {
   Eye, Pencil, Trash2, TrendingUp, ChevronLeft, Star, BarChart3,
 } from "lucide-react"
 import { authorSalesApi, booksApi } from "@/lib/api"
+import { normalizeAuthorMyBooksList } from "@/lib/author-my-books"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import { demoPic } from "@/lib/demo-images"
 import { cn } from "@/lib/utils"
@@ -69,24 +70,8 @@ const MOCK_AUTHOR_ROWS: AuthorBookRow[] = MOCK_BOOKS.slice(0, 6).map((b, i) => (
   publishedAt: ["Jan 5, 2025", "Feb 12, 2025", "—", "Mar 1, 2025", "—", "—"][i],
 }))
 
-type MineBookApi = {
-  id: string
-  title: string
-  category?: string | null
-  coverUrl?: string | null
-  format: string
-  accessType: string
-  approvalStatus: string
-  createdAt: string
-  engagement?: {
-    readerCount?: number
-    pagesRead?: number
-    avgCompletionPct?: number
-  }
-}
-
-function mapApprovalToAuthorStatus(raw: string): BookStatus {
-  const s = raw.toLowerCase()
+function mapApprovalToAuthorStatus(raw: unknown): BookStatus {
+  const s = String(raw ?? "").toLowerCase()
   if (s === "approved" || s === "pending" || s === "rejected" || s === "draft") return s
   return "pending"
 }
@@ -105,25 +90,40 @@ function parseSalesNetByBookId(data: unknown): Record<string, number> {
   return map
 }
 
-function mineApiToRow(b: MineBookApi, earningsByBook: Record<string, number>): AuthorBookRow {
+function mineApiToRow(b: Record<string, unknown>, earningsByBook: Record<string, number>): AuthorBookRow {
+  const fmtRaw = String(b.format ?? "ebook").toLowerCase()
   const fmt =
-    b.format === "audiobook" ? "audiobook" : b.format === "magazine" ? "magazine" : "ebook"
+    fmtRaw === "audiobook" ? "audiobook" : fmtRaw === "magazine" ? "magazine" : "ebook"
+  const accessRaw = String(b.accessType ?? "FREE").toUpperCase()
   const access: AuthorBookRow["accessType"] =
-    b.accessType === "PAID" || b.accessType === "SUBSCRIPTION" ? b.accessType : "FREE"
-  const st = mapApprovalToAuthorStatus(b.approvalStatus)
+    accessRaw === "PAID" || accessRaw === "SUBSCRIPTION" ? accessRaw : "FREE"
+  const approval = b.approvalStatus
+  const st = mapApprovalToAuthorStatus(approval)
+  const createdRaw = b.createdAt
+  const createdMs =
+    createdRaw instanceof Date
+      ? createdRaw.getTime()
+      : Date.parse(typeof createdRaw === "string" || typeof createdRaw === "number" ? String(createdRaw) : "")
+  const approved = String(approval ?? "").toLowerCase() === "approved"
   const publishedAt =
-    b.approvalStatus?.toLowerCase() === "approved"
-      ? new Date(b.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    approved && Number.isFinite(createdMs)
+      ? new Date(createdMs).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
       : "—"
-  const pr = Number(b.engagement?.pagesRead ?? 0)
+  const eng =
+    b.engagement && typeof b.engagement === "object"
+      ? (b.engagement as Record<string, unknown>)
+      : {}
+  const pr = Number(eng.pagesRead ?? eng.pages_read ?? 0)
   const reads = Number.isFinite(pr) ? Math.max(0, Math.floor(pr)) : 0
-  const id = String(b.id)
+  const id = String(b.id ?? "")
   const er = Number(earningsByBook[id] ?? 0)
+  const cat = typeof b.category === "string" ? b.category.trim() : ""
+  const cover = typeof b.coverUrl === "string" ? b.coverUrl.trim() : ""
   return {
     id,
-    title: b.title,
-    category: b.category?.trim() ? b.category : "—",
-    coverUrl: b.coverUrl?.trim() ? b.coverUrl : demoPic("fallback-cover"),
+    title: String(b.title ?? "Untitled"),
+    category: cat || "—",
+    coverUrl: cover || demoPic("fallback-cover"),
     format: fmt,
     accessType: access,
     status: st,
@@ -178,7 +178,7 @@ function AuthorBooksContent() {
       .then(([mineRes, salesRes]) => {
         if (!alive) return
         const earnMap = parseSalesNetByBookId(salesRes.data)
-        const rows = (Array.isArray(mineRes.data) ? mineRes.data : []) as MineBookApi[]
+        const rows = normalizeAuthorMyBooksList(mineRes)
         setLiveBooks(rows.map(b => mineApiToRow(b, earnMap)))
       })
       .catch(() => {

@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { authorSubscriptionPoolApi, booksApi } from "@/lib/api"
+import { normalizeAuthorMyBooksList } from "@/lib/author-my-books"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import { demoPic } from "@/lib/demo-images"
 import {
@@ -173,13 +174,19 @@ function parseLiveEngagementBooks(data: unknown): LiveEngagementBookRow[] {
     const rc = Number(eng.readerCount ?? eng.reader_count ?? 0)
     const avg = Number(eng.avgCompletionPct ?? eng.avg_completion_pct ?? 0)
     const pr = Number(eng.pagesRead ?? eng.pages_read ?? 0)
+    const accessRaw = b.accessType ?? b.access_type
     const access =
-      b.accessType === "PAID" || b.accessType === "SUBSCRIPTION" ? String(b.accessType) : "FREE"
+      accessRaw === "PAID" || accessRaw === "SUBSCRIPTION" ? String(accessRaw) : "FREE"
+    const coverStr =
+      typeof b.coverUrl === "string" && b.coverUrl.trim()
+        ? b.coverUrl
+        : typeof b.cover_url === "string" && b.cover_url.trim()
+          ? b.cover_url
+          : ""
     out.push({
       id: String(b.id ?? ""),
       title: String(b.title ?? "Untitled"),
-      coverUrl:
-        typeof b.coverUrl === "string" && b.coverUrl.trim() ? b.coverUrl : demoPic("fallback-cover"),
+      coverUrl: coverStr || demoPic("fallback-cover"),
       category: typeof b.category === "string" && b.category.trim() ? b.category : "—",
       accessType: access,
       readerCount: Number.isFinite(rc) ? Math.max(0, Math.floor(rc)) : 0,
@@ -603,7 +610,7 @@ function EarningsContent() {
         )
         setPayouts(apiPayouts)
         setCycles(apiCycles.length > 0 ? apiCycles : revenueCycleStore.getAll())
-        setLiveEngagementBooks(parseLiveEngagementBooks(mineRes.data))
+        setLiveEngagementBooks(parseLiveEngagementBooks(normalizeAuthorMyBooksList(mineRes)))
       })
       .catch(() => {
         if (!alive) return
