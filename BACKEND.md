@@ -499,6 +499,7 @@ Author uploads use the same upload flow for EPUB and PDF (`book_file_s3_key`); p
 | 2026-04-12 | Reports always use API in prod | `components/report-dialog.tsx` | No new endpoint — existing `POST /reports` now always called in production |
 | 2026-04-12 | Middleware auth protection | `middleware.ts` | No backend change — server-side route guarding via auth cookie |
 | 2026-04-12 | Seed functions disabled in prod | `lib/store.ts`, `lib/store-p4.ts`, `lib/author-courses-store.ts` | No backend change — mock data no longer seeded in production |
+| 2026-04-12 | CSP: unsafe-eval in dev only | `next.config.js` | No backend change — `script-src` includes `'unsafe-eval'` when `NODE_ENV=development` (React dev); production unchanged |
 | 2026-04-12 | CSP tightened | `next.config.js` | No backend change — removed `unsafe-eval` from Content-Security-Policy |
 | 2026-04-12 | Error reporting facade | `lib/error-reporting.ts`, `app/error.tsx`, `app/global-error.tsx` | No backend change — structured error logging for Vercel log drain |
 | 2026-04-12 | Footer newsletter wired to API | `components/layout/footer-newsletter.tsx` | Ensure `POST /newsletter/subscribe` stores email + sends confirmation |

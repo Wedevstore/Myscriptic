@@ -3,6 +3,16 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {
+    const isDev = process.env.NODE_ENV === "development"
+    const scriptSrc = [
+      "'self'",
+      "'unsafe-inline'",
+      ...(isDev ? ["'unsafe-eval'"] : []),
+      "https://accounts.google.com",
+      "https://appleid.cdn-apple.com",
+      "https://pagead2.googlesyndication.com",
+    ].join(" ")
+
     return [
       {
         source: "/:path*",
@@ -23,7 +33,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://accounts.google.com https://appleid.cdn-apple.com https://pagead2.googlesyndication.com",
+              `script-src ${scriptSrc}`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob: https: http:",
               "font-src 'self' https://fonts.gstatic.com",

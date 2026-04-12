@@ -524,6 +524,9 @@ function ReaderContent() {
   }, [])
 
   React.useEffect(() => {
+    if (accessState === "checking") return
+    if (accessState !== "allowed") return
+
     let alive = true
 
     async function loadChapters() {
@@ -611,7 +614,7 @@ function ReaderContent() {
 
     loadChapters()
     return () => { alive = false }
-  }, [engagementBookId, routeId, applyParsed, book.format])
+  }, [accessState, engagementBookId, routeId, applyParsed, book.format])
 
   // ── Access check ────────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -636,9 +639,10 @@ function ReaderContent() {
         booksApi.get(routeId),
       ]).then(([access, wrap]) => {
         if (!alive) return
-        const d = wrap.data as { accessType?: string }
+        const d = wrap.data as Record<string, unknown>
+        const at = ((d.accessType ?? d.access_type ?? "") as string).toUpperCase()
         if (access.has_access) setAccessState("allowed")
-        else if (d.accessType === "PAID") setAccessState("denied_paid")
+        else if (at === "PAID") setAccessState("denied_paid")
         else setAccessState("denied_subscription")
       }).catch(() => {
         if (alive) setAccessState("denied_subscription")
@@ -908,8 +912,8 @@ function ReaderContent() {
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement
-      if (el.closest('[role="slider"]') || el.tagName === "INPUT" || el.tagName === "TEXTAREA") return
+      const el = e.target as HTMLElement | null
+      if (el?.closest?.('[role="slider"]') || el?.tagName === "INPUT" || el?.tagName === "TEXTAREA") return
       if (e.key === "ArrowLeft") {
         e.preventDefault()
         setCurrentPage(p => {
@@ -936,9 +940,9 @@ function ReaderContent() {
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement
+      const el = e.target as HTMLElement | null
       const inField =
-        el.closest('[role="slider"]') != null || el.tagName === "INPUT" || el.tagName === "TEXTAREA"
+        el?.closest?.('[role="slider"]') != null || el?.tagName === "INPUT" || el?.tagName === "TEXTAREA"
 
       if (e.key === "Escape") {
         if (readerHelpOpen) {
@@ -1203,8 +1207,8 @@ function ReaderContent() {
     window.addEventListener("wheel", cancel, { passive: true })
     window.addEventListener("touchmove", cancel, { passive: true })
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement
-      if (el.closest('[role="slider"]') || el.tagName === "INPUT" || el.tagName === "TEXTAREA") return
+      const el = e.target as HTMLElement | null
+      if (el?.closest?.('[role="slider"]') || el?.tagName === "INPUT" || el?.tagName === "TEXTAREA") return
       const k = e.key
       if (
         k === "ArrowUp" ||

@@ -103,15 +103,25 @@ function saveDiscoverFlags(key: string, flags: Record<string, boolean>) {
 
 const STAFF_PICKS_MOCK = MOCK_BOOKS.filter(b => b.rating >= 4.6).slice(0, 3)
 
-function TrendingTicker({ titles }: { titles: string[] }) {
-  const list = titles.length > 0 ? titles : ["Discover trending books on MyScriptic"]
-  const summary = list.join(", ")
+type TickerItem = { title: string; href: string }
 
-  const titleSpans = (keyPrefix: string) =>
-    list.map((t, i) => (
-      <span key={`${keyPrefix}-${i}`} className="inline-flex shrink-0 items-center gap-2 text-sm text-foreground/70">
-        {t}
-        <span className="text-brand/40" aria-hidden>
+function TrendingTicker({ items }: { items: TickerItem[] }) {
+  const list: TickerItem[] =
+    items.length > 0
+      ? items
+      : [{ title: "Discover trending books on MyScriptic", href: "/books" }]
+  const summary = list.map(i => i.title).join(", ")
+
+  const titleRow = (keyPrefix: string) =>
+    list.map((item, i) => (
+      <span key={`${keyPrefix}-${item.href}-${i}`} className="inline-flex shrink-0 items-center gap-2">
+        <Link
+          href={item.href}
+          className="text-sm text-foreground/70 hover:text-brand focus-visible:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm transition-colors"
+        >
+          {item.title}
+        </Link>
+        <span className="text-brand/40 select-none" aria-hidden>
           ·
         </span>
       </span>
@@ -132,21 +142,23 @@ function TrendingTicker({ titles }: { titles: string[] }) {
           Trending
         </div>
         <div className="relative min-w-0 flex-1 trending-marquee-fade py-0.5">
-          <div className="overflow-hidden motion-reduce:hidden" aria-hidden>
+          <div className="overflow-hidden motion-reduce:hidden">
             <div className="trending-marquee-track items-center gap-6">
-              {titleSpans("m1")}
-              {titleSpans("m2")}
+              {titleRow("m1")}
+              {titleRow("m2")}
             </div>
           </div>
-          <div
-            className="hidden motion-reduce:flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/70"
-            aria-hidden
-          >
-            {list.map((t, i) => (
-              <span key={`static-${i}`}>
-                {t}
+          <div className="hidden motion-reduce:flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {list.map((item, i) => (
+              <span key={`static-${item.href}-${i}`} className="inline-flex items-center gap-2">
+                <Link
+                  href={item.href}
+                  className="text-foreground/70 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm transition-colors"
+                >
+                  {item.title}
+                </Link>
                 {i < list.length - 1 ? (
-                  <span className="text-brand/40 mx-1.5" aria-hidden>
+                  <span className="text-brand/40 mx-1.5 select-none" aria-hidden>
                     ·
                   </span>
                 ) : null}
@@ -196,7 +208,7 @@ const MOCK_TAB_BOOKS = {
 async function fetchDiscoverLive(): Promise<{
   tabBooks: typeof MOCK_TAB_BOOKS
   staffPicks: BookCardData[]
-  tickerTitles: string[]
+  tickerItems: TickerItem[]
   spotlights: SpotlightSection[]
 }> {
   const [featRes, freeRes, wideRes] = await Promise.all([
@@ -228,10 +240,12 @@ async function fetchDiscoverLive(): Promise<{
       ? sortedByRating.filter(b => (b.rating ?? 0) >= 4).slice(0, 3)
       : featured.slice(0, 3)
 
-  const tickerTitles =
-    featured.filter(b => b.isTrending).map(b => b.title).length > 0
-      ? featured.filter(b => b.isTrending).map(b => b.title)
-      : featured.map(b => b.title)
+  const trendingForTicker = featured.filter(b => b.isTrending)
+  const tickerSource = trendingForTicker.length > 0 ? trendingForTicker : featured
+  const tickerItems: TickerItem[] = tickerSource.map(b => ({
+    title: b.title,
+    href: `/books/${b.id}`,
+  }))
 
   const spotlights: SpotlightSection[] = GENRE_SPOTLIGHTS_BASE.map((s, i) => {
     const slice = featured.slice(i * 4, i * 4 + 4)
@@ -241,7 +255,7 @@ async function fetchDiscoverLive(): Promise<{
     }
   })
 
-  return { tabBooks, staffPicks, tickerTitles, spotlights }
+  return { tabBooks, staffPicks, tickerItems, spotlights }
 }
 
 function DiscoverContent() {
@@ -288,11 +302,14 @@ function DiscoverContent() {
   const mockFb = allowMockCatalogFallback()
   const tabBooks = live?.tabBooks ?? (mockFb ? MOCK_TAB_BOOKS : EMPTY_DISCOVER_TABS)
   const staffPicks = live?.staffPicks ?? (mockFb ? STAFF_PICKS_MOCK : [])
-  const tickerTitles =
-    live?.tickerTitles?.length
-      ? live.tickerTitles
+  const tickerItems: TickerItem[] =
+    live?.tickerItems?.length
+      ? live.tickerItems
       : mockFb
-        ? MOCK_BOOKS.filter(b => b.isTrending).map(b => b.title)
+        ? MOCK_BOOKS.filter(b => b.isTrending).map(b => ({
+            title: b.title,
+            href: `/books/${b.id}`,
+          }))
         : []
   const genreSpotlights = live?.spotlights ?? (mockFb ? GENRE_SPOTLIGHTS_BASE : emptySpotlights())
 
@@ -306,7 +323,7 @@ function DiscoverContent() {
 
   return (
     <div>
-      <TrendingTicker titles={tickerTitles} />
+      <TrendingTicker items={tickerItems} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
         {/* Page header */}
