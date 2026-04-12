@@ -11,7 +11,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Providers } from "@/components/providers"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Button } from "@/components/ui/button"
@@ -31,12 +31,18 @@ import {
   ChevronLeft, ChevronRight, BookOpen, Sun, Moon,
   Minus, Plus,   List, X, Settings, Type, Clock,
   Lock, ShoppingCart, Crown, CheckCircle,
-  Library, PanelTopOpen, Bookmark,
+  Library, PanelTopOpen, Bookmark, Search,
   Palette, Sparkles, Rows3, ScrollText, GalleryHorizontal, Play, Pause, HelpCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ProtectedSurface } from "@/components/protected-surface"
-import { loadParsedBook, type ParsedChapter } from "@/lib/book-parser"
+import {
+  loadParsedBook,
+  saveParsedBook,
+  fetchAndParseBook,
+  type ParsedChapter,
+  type ParsedBook,
+} from "@/lib/book-parser"
 
 // ── Fallback mock content (shown when no parsed book is available) ────────────
 const MOCK_PAGES = [
@@ -127,11 +133,18 @@ Adaeze turned to the title page. The name written there was simply: ZARA.`,
 ]
 
 /** Convert parsed chapters to the page shape the reader uses internally. */
-function chaptersToPages(chapters: ParsedChapter[]): { page: number; content: string }[] {
+function chaptersToPages(chapters: ParsedChapter[], contentType?: "html" | "text"): { page: number; content: string; contentType?: "html" | "text" }[] {
   return chapters.map((ch, i) => ({
     page: i + 1,
-    content: `${ch.title}\n\n${ch.content}`,
+    content: contentType === "html"
+      ? `<h2>${escapeHtml(ch.title)}</h2>${ch.content}`
+      : `${ch.title}\n\n${ch.content}`,
+    contentType,
   }))
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 }
 
 const TOTAL_PAGES_FALLBACK = 342
@@ -448,8 +461,10 @@ function useEngagementTracker(userId: string, bookId: string, currentPage: numbe
 function ReaderContent() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const sp = useSearchParams()
   const { user, isAuthenticated, isLoading } = useAuth()
   const routeId = params?.id ?? ""
+  const isPreview = sp?.get("preview") === "1"
 
   const [remoteBook, setRemoteBook] = React.useState<BookCardData | null>(null)
 
@@ -475,25 +490,109 @@ function ReaderContent() {
 
   const book = remoteBook ?? MOCK_BOOKS.find(b => b.id === routeId) ?? MOCK_BOOKS[0]
 
+  /** Audiobooks live in S3 and use `/audio/[id]`; skip ebook fetch/parse pipeline. */
+  React.useEffect(() => {
+    if (book.format !== "audiobook") return
+    router.replace(`/audio/${routeId}`)
+  }, [book.format, routeId, router])
+
   /** Stable id for engagement + progress APIs (numeric Laravel id vs mock `bk_*`). */
   const engagementBookId = /^\d+$/.test(routeId) ? routeId : book.id
 
-  // ── Load parsed chapters if available ──────────────────────────────────────
-  const [readerPages, setReaderPages] = React.useState(() => MOCK_PAGES)
+  // ── Load parsed chapters: localStorage → API chapters → S3 fetch+parse ───
+  const [readerPages, setReaderPages] = React.useState<{ page: number; content: string; contentType?: "html" | "text" }[]>(() => MOCK_PAGES)
   const [hasParsedContent, setHasParsedContent] = React.useState(false)
+  const [contentLoading, setContentLoading] = React.useState(false)
+  const [contentProgress, setContentProgress] = React.useState<string | null>(null)
+  const [contentError, setContentError] = React.useState<string | null>(null)
   const totalPages = hasParsedContent ? readerPages.length : TOTAL_PAGES_FALLBACK
   const tocEntries = React.useMemo(() => buildToc(readerPages), [readerPages])
 
+  const applyParsed = React.useCallback((parsed: ParsedBook) => {
+    setReaderPages(chaptersToPages(parsed.chapters, parsed.contentType))
+    setHasParsedContent(true)
+    setContentLoading(false)
+    setContentProgress(null)
+    setContentError(null)
+  }, [])
+
   React.useEffect(() => {
-    const parsed = loadParsedBook(engagementBookId)
-    if (parsed && parsed.chapters.length > 0) {
-      setReaderPages(chaptersToPages(parsed.chapters))
-      setHasParsedContent(true)
-    } else {
+    const localCached = loadParsedBook(engagementBookId)
+    if (localCached && localCached.chapters.length > 0) {
+      applyParsed(localCached)
+      return
+    }
+
+    const isLive =
+      laravelPhase3Enabled() && /^\d+$/.test(routeId) && book.format !== "audiobook"
+    if (!isLive) {
       setReaderPages(MOCK_PAGES)
       setHasParsedContent(false)
+      return
     }
-  }, [engagementBookId])
+
+    let alive = true
+    setContentLoading(true)
+    setContentProgress("Loading chapters…")
+
+    ;(async () => {
+      try {
+        const chaptersRes = await booksApi.getChapters(routeId)
+        if (!alive) return
+        if (chaptersRes.data && chaptersRes.data.length > 0) {
+          const looksLikeHtml = /<[a-z][\s\S]*>/i.test(chaptersRes.data[0]?.content ?? "")
+          const rebuilt: ParsedBook = {
+            format: "epub",
+            title: null,
+            author: null,
+            chapters: chaptersRes.data,
+            totalCharacters: chaptersRes.data.reduce((s, c) => s + c.content.length, 0),
+            parsedAt: new Date().toISOString(),
+            contentType: looksLikeHtml ? "html" : "text",
+          }
+          saveParsedBook(engagementBookId, rebuilt)
+          if (alive) applyParsed(rebuilt)
+          return
+        }
+      } catch {
+        /* API chapters not available — try S3 */
+      }
+
+      if (!alive) return
+      try {
+        setContentProgress("Fetching book file…")
+        const { url } = await libraryApi.getSignedUrl(routeId)
+        if (!alive) return
+        const parsed = await fetchAndParseBook(
+          engagementBookId,
+          url,
+          alive ? setContentProgress : undefined
+        )
+        if (!alive) return
+        applyParsed(parsed)
+
+        try {
+          await booksApi.saveChapters(
+            routeId,
+            parsed.chapters.map((ch, i) => ({ index: i, title: ch.title, content: ch.content }))
+          )
+        } catch {
+          /* best-effort server cache */
+        }
+      } catch (err) {
+        if (!alive) return
+        setContentLoading(false)
+        setContentProgress(null)
+        setContentError(
+          err instanceof Error ? err.message : "Could not load book content."
+        )
+        setReaderPages(MOCK_PAGES)
+        setHasParsedContent(false)
+      }
+    })()
+
+    return () => { alive = false }
+  }, [engagementBookId, routeId, applyParsed, book.format])
 
   // ── Access check ────────────────────────────────────────────────────────────
   const [accessState, setAccessState] = React.useState<
@@ -504,7 +603,14 @@ function ReaderContent() {
     if (isLoading) return
     if (!isAuthenticated) {
       const id = routeId || book.id
-      router.replace(`/auth/login?next=${encodeURIComponent(`/reader/${id}`)}`)
+      const nextPath = book.format === "audiobook" ? `/audio/${id}` : `/reader/${id}`
+      router.replace(`/auth/login?next=${encodeURIComponent(nextPath)}`)
+      return
+    }
+
+    // Preview mode bypasses access check for authors/admins
+    if (isPreview && user && (user.role === "admin" || user.role === "staff" || user.role === "author")) {
+      setAccessState("allowed")
       return
     }
 
@@ -536,7 +642,7 @@ function ReaderContent() {
     } else {
       setAccessState("denied_subscription")
     }
-  }, [isLoading, isAuthenticated, user, book, router, routeId])
+  }, [isLoading, isAuthenticated, user, book, router, routeId, isPreview])
 
   // ── Reader state ────────────────────────────────────────────────────────────
   const [currentPage,  setCurrentPage]  = React.useState(1)
@@ -551,6 +657,25 @@ function ReaderContent() {
   /** When off (default), top/bottom bars stay visible so navigation and settings are always discoverable. */
   const [immersiveMode, setImmersiveMode] = React.useState(readStoredReaderImmersive)
   const [bookmarkPage, setBookmarkPage] = React.useState<number | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const searchResults = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (q.length < 2) return []
+    const results: { page: number; snippet: string; chapterLabel: string }[] = []
+    for (const p of readerPages) {
+      const plainContent = p.contentType === "html"
+        ? p.content.replace(/<[^>]+>/g, "")
+        : p.content
+      const idx = plainContent.toLowerCase().indexOf(q)
+      if (idx === -1) continue
+      const start = Math.max(0, idx - 40)
+      const end = Math.min(plainContent.length, idx + q.length + 40)
+      const snippet = (start > 0 ? "…" : "") + plainContent.slice(start, end) + (end < plainContent.length ? "…" : "")
+      const label = hasParsedContent ? `Chapter ${p.page}` : `Page ${p.page}`
+      results.push({ page: p.page, snippet, chapterLabel: label })
+    }
+    return results
+  }, [searchQuery, readerPages, hasParsedContent])
   const [readingLayout, setReadingLayoutState] = React.useState<ReadingLayout>(() => {
     if (typeof window === "undefined") return "vertical"
     try {
@@ -1095,11 +1220,20 @@ function ReaderContent() {
   }, [prefersReducedMotion, readingLayout])
 
   // ── Loading / Access gate renders ─────────────────────────────────────────
+  if (book.format === "audiobook") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-3">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" aria-hidden />
+        <p className="text-sm text-muted-foreground">Opening audiobook player…</p>
+      </div>
+    )
+  }
+
   if (isLoading || accessState === "checking") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background" role="status" aria-live="polite">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+          <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" aria-hidden="true" />
           <p className="text-sm text-muted-foreground">Checking access…</p>
         </div>
       </div>
@@ -1110,6 +1244,30 @@ function ReaderContent() {
   }
   if (accessState === "denied_paid")         return <AccessDeniedPaid book={book} />
 
+  if (contentLoading && !hasParsedContent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-6" role="status" aria-live="polite">
+        <div className="max-w-sm w-full text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-brand/10 flex items-center justify-center mx-auto">
+            <BookOpen size={28} className="text-brand animate-pulse" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="font-serif text-xl font-bold text-foreground mb-1">
+              Preparing your book
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {contentProgress || "Loading content from the cloud…"}
+            </p>
+          </div>
+          <div className="w-8 h-8 mx-auto rounded-full border-2 border-brand border-t-transparent animate-spin" aria-hidden="true" />
+          <p className="text-xs text-muted-foreground">
+            Chapters are extracted on first read and cached for instant access next time.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   // ── Full reader UI ─────────────────────────────────────────────────────────
   return (
     <div
@@ -1119,6 +1277,60 @@ function ReaderContent() {
         styles.bg
       )}
     >
+      {/* Content fetch error banner */}
+      {isPreview && (
+        <div className={cn(
+          "fixed top-0 left-0 right-0 z-[70] px-4 py-1.5 text-center text-xs font-medium",
+          theme === "dark" ? "bg-amber-900/60 text-amber-200" : "bg-amber-50 text-amber-800 border-b border-amber-200"
+        )}>
+          Preview Mode — you are viewing this book as a reader would see it
+        </div>
+      )}
+      {contentError && (
+        <div className={cn(
+          "fixed left-0 right-0 z-[70] px-4 py-2.5 text-center text-sm font-medium flex items-center justify-center gap-3 flex-wrap",
+          isPreview ? "top-7" : "top-0",
+          theme === "dark" ? "bg-red-900/80 text-red-200" : "bg-red-50 text-red-700 border-b border-red-200"
+        )}>
+          <span>Could not load book file: {contentError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setContentError(null)
+              setContentLoading(true)
+              setContentProgress("Retrying…")
+              const isLive = laravelPhase3Enabled() && /^\d+$/.test(routeId)
+              if (isLive) {
+                libraryApi.getSignedUrl(routeId)
+                  .then(({ url }) => fetchAndParseBook(engagementBookId, url, setContentProgress))
+                  .then(applyParsed)
+                  .catch(err => {
+                    setContentLoading(false)
+                    setContentProgress(null)
+                    setContentError(err instanceof Error ? err.message : "Retry failed.")
+                  })
+              } else {
+                setContentLoading(false)
+                setContentProgress(null)
+              }
+            }}
+            className={cn(
+              "px-3 py-1 rounded-lg text-xs font-semibold transition-colors",
+              theme === "dark" ? "bg-red-800 hover:bg-red-700 text-red-100" : "bg-red-100 hover:bg-red-200 text-red-800"
+            )}
+          >
+            Retry
+          </button>
+          <button
+            type="button"
+            onClick={() => setContentError(null)}
+            className="text-xs opacity-70 hover:opacity-100 underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Always-visible book progress (full title length) */}
       <div
         className={cn(
@@ -2076,6 +2288,53 @@ function ReaderContent() {
                 {readerPages.length} chapter{readerPages.length !== 1 ? "s" : ""} extracted from file
               </div>
             )}
+            {/* In-book search */}
+            <div className="mx-4 mt-3">
+              <div className={cn(
+                "flex items-center gap-2 rounded-lg border px-3 py-2",
+                theme === "dark" ? "border-gray-700 bg-gray-800/50" : theme === "sepia" ? "border-amber-200 bg-amber-100/50" : "border-gray-200 bg-gray-50"
+              )}>
+                <Search size={14} className="text-muted-foreground shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search in book…"
+                  className={cn(
+                    "flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground",
+                    theme === "dark" ? "text-gray-100" : theme === "sepia" ? "text-amber-950" : "text-gray-900"
+                  )}
+                />
+                {searchQuery && (
+                  <button type="button" onClick={() => setSearchQuery("")} aria-label="Clear search">
+                    <X size={14} className="text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+              {searchQuery.trim().length >= 2 && (
+                <p className={cn("text-xs mt-1.5 px-1", theme === "dark" ? "text-gray-400" : "text-muted-foreground")}>
+                  {searchResults.length} match{searchResults.length !== 1 ? "es" : ""} found
+                </p>
+              )}
+            </div>
+            {searchQuery.trim().length >= 2 && searchResults.length > 0 ? (
+              <div className="p-4 space-y-1">
+                {searchResults.map((r, i) => (
+                  <button
+                    key={`${r.page}-${i}`}
+                    type="button"
+                    onClick={() => { goTo(r.page); setShowToc(false) }}
+                    className={cn(
+                      "w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors",
+                      theme === "dark" ? "text-gray-300 hover:bg-gray-800" : theme === "sepia" ? "text-amber-950 hover:bg-amber-100" : "text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    <span className="text-[10px] text-brand font-medium block">{r.chapterLabel}</span>
+                    <span className="text-xs opacity-75 line-clamp-2">{r.snippet}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
             <div className="p-4 space-y-1">
               {tocEntries.map((entry, i) => (
                 <button
@@ -2103,6 +2362,7 @@ function ReaderContent() {
                 </button>
               ))}
             </div>
+            )}
 
             {/* Engagement mini-stats in TOC sidebar */}
             {user && (
@@ -2191,14 +2451,18 @@ function ReaderContent() {
           }}
         >
           {readingLayout === "vertical" ? (
-            <article className={cn(fontFamily === "serif" ? "font-serif" : "font-sans")}>
+            <article dir="auto" className={cn(fontFamily === "serif" ? "font-serif" : "font-sans", "reader-typography")}>
               {readerPages.map(p => (
                 <section
                   key={p.page}
                   id={`reader-section-${p.page}`}
                   className="mb-14 scroll-mt-28 last:mb-8 sm:scroll-mt-32"
                 >
-                  <div className="whitespace-pre-wrap">{p.content}</div>
+                  {p.contentType === "html" ? (
+                    <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none prose-headings:font-serif prose-img:rounded-lg" dangerouslySetInnerHTML={{ __html: p.content }} />
+                  ) : (
+                    <div className="whitespace-pre-wrap">{p.content}</div>
+                  )}
                 </section>
               ))}
             </article>
@@ -2222,8 +2486,12 @@ function ReaderContent() {
                   )}
                 >
                   <div className="mx-auto max-w-2xl">
-                    <article className={cn(fontFamily === "serif" ? "font-serif" : "font-sans")}>
-                      <div className="whitespace-pre-wrap">{p.content}</div>
+                    <article dir="auto" className={cn(fontFamily === "serif" ? "font-serif" : "font-sans", "reader-typography")}>
+                      {p.contentType === "html" ? (
+                        <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none prose-headings:font-serif prose-img:rounded-lg" dangerouslySetInnerHTML={{ __html: p.content }} />
+                      ) : (
+                        <div className="whitespace-pre-wrap">{p.content}</div>
+                      )}
                     </article>
                   </div>
                 </div>
@@ -2436,7 +2704,9 @@ function ElapsedTimer({ elapsedSecRef }: { elapsedSecRef: React.MutableRefObject
 export default function ReaderPage() {
   return (
     <Providers>
-      <ReaderContent />
+      <React.Suspense fallback={null}>
+        <ReaderContent />
+      </React.Suspense>
     </Providers>
   )
 }

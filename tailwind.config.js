@@ -6,6 +6,7 @@ module.exports = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  plugins: [require("@tailwindcss/typography")],
   theme: {
     extend: {
       fontFamily: {
@@ -79,5 +80,4 @@ module.exports = {
       },
     }
   },
-  plugins: [require('tailwindcss-animate')],
 }

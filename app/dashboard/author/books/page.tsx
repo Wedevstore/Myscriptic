@@ -407,6 +407,11 @@ function AuthorBooksContent() {
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
+                            <Link href={`/reader/${book.id}?preview=1`} className="flex items-center gap-2 cursor-pointer">
+                              <BookOpen size={13} /> Preview as Reader
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
                             <Link href={`/dashboard/author/books/new?edit=${book.id}`} className="flex items-center gap-2 cursor-pointer">
                               <Pencil size={13} /> Edit Book
                             </Link>

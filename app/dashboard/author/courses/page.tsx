@@ -42,7 +42,7 @@ function AuthorCoursesListContent() {
     }
     seedAuthorCourses()
     setRows(authorCourseStore.getByAuthor(user.id))
-  }, [user?.id])
+  }, [user])
 
   React.useEffect(() => {
     refresh()

@@ -22,7 +22,7 @@ import {
 } from "@/lib/author-follows-client"
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
 import {
-  Users, BookOpen, Star, CheckCircle2, ArrowLeft, Twitter,
+  Users, BookOpen, Star, CheckCircle2, ArrowLeft, Bird,
   Globe, MessageSquare, Award, TrendingUp, GraduationCap, PlayCircle, ArrowRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -542,7 +542,7 @@ function MockAuthorProfile({ authorId }: { authorId: string }) {
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-brand transition-colors"
                 >
-                  <Twitter size={13} />
+                  <Bird size={13} />
                   {author.twitter}
                 </a>
               )}

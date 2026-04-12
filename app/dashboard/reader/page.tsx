@@ -75,24 +75,33 @@ function ReadingProgressCard({
   record: EngagementRecord
   display?: LiveBookDisplay | null
 }) {
-  const fromMock = MOCK_BOOKS.find(b => b.id === record.bookId)
-  const title = display?.title ?? fromMock?.title
-  const author = display?.author ?? fromMock?.author ?? ""
-  const coverUrl = display?.coverUrl ?? fromMock?.coverUrl ?? demoPic("fallback-cover")
-  if (!title) return null
+  const [nowMs, setNowMs] = React.useState(() => Date.now())
+  React.useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 60_000)
+    return () => clearInterval(t)
+  }, [])
 
-  const lastReadLabel = (() => {
-    const diff = Date.now() - new Date(record.lastPageAt).getTime()
-    const min  = Math.floor(diff / 60000)
+  const lastReadLabel = React.useMemo(() => {
+    const diff = nowMs - new Date(record.lastPageAt).getTime()
+    const min = Math.floor(diff / 60000)
     if (min < 60) return `${min}m ago`
     const h = Math.floor(min / 60)
     if (h < 24) return `${h}h ago`
     return `${Math.floor(h / 24)}d ago`
-  })()
+  }, [nowMs, record.lastPageAt])
+
+  const fromMock = MOCK_BOOKS.find(b => b.id === record.bookId)
+  const title = display?.title ?? fromMock?.title
+  const author = display?.author ?? fromMock?.author ?? ""
+  const coverUrl = display?.coverUrl ?? fromMock?.coverUrl ?? demoPic("fallback-cover")
+  const fmt = display?.format ?? fromMock?.format
+  const continueHref =
+    fmt === "audiobook" ? `/audio/${record.bookId}` : `/reader/${record.bookId}`
+  if (!title) return null
 
   return (
     <div className="flex gap-3 p-4 rounded-xl border border-border bg-card hover:border-brand/30 transition-all group">
-      <Link href={`/books/${record.bookId}`} className="shrink-0">
+      <Link href={continueHref} className="shrink-0">
         <img
           src={coverUrl}
           alt={`Cover of ${title}`}
@@ -100,7 +109,7 @@ function ReadingProgressCard({
         />
       </Link>
       <div className="flex-1 min-w-0">
-        <Link href={`/books/${record.bookId}`}>
+        <Link href={continueHref}>
           <h4 className="font-semibold text-sm text-foreground group-hover:text-brand transition-colors line-clamp-1">
             {title}
           </h4>
@@ -120,7 +129,7 @@ function ReadingProgressCard({
           <span className="text-[10px] text-muted-foreground">{lastReadLabel}</span>
         </div>
       </div>
-      <Link href={`/reader/${record.bookId}`}>
+      <Link href={continueHref}>
         <Button size="sm" variant="outline" className="h-7 text-xs px-2 hover:border-brand hover:text-brand self-center">
           Resume
         </Button>
@@ -368,9 +377,12 @@ function DashboardContent() {
                   const fromMock = MOCK_BOOKS.find(b => b.id === record.bookId)
                   const title = d?.title ?? fromMock?.title
                   const coverUrl = d?.coverUrl ?? fromMock?.coverUrl ?? demoPic("fallback-cover")
+                  const doneFmt = d?.format ?? fromMock?.format
+                  const doneHref =
+                    doneFmt === "audiobook" ? `/audio/${record.bookId}` : `/books/${record.bookId}`
                   if (!title) return null
                   return (
-                    <Link key={record.id} href={`/books/${record.bookId}`}>
+                    <Link key={record.id} href={doneHref}>
                       <div className="flex gap-2.5 p-3 rounded-xl border border-border bg-card hover:border-brand/30 transition-all group">
                         <img
                           src={coverUrl}

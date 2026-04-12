@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -25,12 +25,12 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@react-oauth/google": "^0.12.1",
+    "@tailwindcss/typography": "^0.5.19",
     "@vimeo/player": "^2.30.3",
-    "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "jszip": "^3.10.1",
-    "lucide-react": "^0.400.0",
+    "lucide-react": "^1.7.0",
     "next": "^16.2.1",
     "otplib": "^13.4.0",
     "pdfjs-dist": "^5.6.205",
@@ -39,17 +39,19 @@
     "react-dom": "^19.2.4",
     "recharts": "^3.8.1",
     "tailwind-merge": "^2.3.0",
-    "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
     "@types/jszip": "^3.4.0",
     "@types/node": "^20.0.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "eslint": "^8.0.0",
-    "eslint-config-next": "^15.0.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.3",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.2.2",
     "typescript": "^5.0.0"
   }
 }

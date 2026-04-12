@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { BookOpen, Twitter, Instagram, Facebook, Youtube } from "lucide-react"
+import { BookOpen, Bird, Camera, UsersRound, Tv } from "lucide-react"
 import { FooterNewsletter } from "@/components/layout/footer-newsletter"
 
 const FOOTER_LINKS = {
@@ -36,10 +36,10 @@ const FOOTER_LINKS = {
 }
 
 const SOCIALS = [
-  { icon: Twitter,   label: "Twitter",   href: "#" },
-  { icon: Instagram, label: "Instagram", href: "#" },
-  { icon: Facebook,  label: "Facebook",  href: "#" },
-  { icon: Youtube,   label: "YouTube",   href: "#" },
+  { icon: Bird,       label: "Twitter / X", href: "#" },
+  { icon: Camera,     label: "Instagram", href: "#" },
+  { icon: UsersRound, label: "Facebook",  href: "#" },
+  { icon: Tv,         label: "YouTube",   href: "#" },
 ]
 
 export function Footer() {

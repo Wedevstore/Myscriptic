@@ -383,9 +383,18 @@ function BooksContent() {
                             <button
                               type="button"
                               className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                              aria-label="Preview book"
+                              aria-label="View book page"
                             >
                               <Eye size={13} />
+                            </button>
+                          </Link>
+                          <Link href={`/reader/${book.id}?preview=1`}>
+                            <button
+                              type="button"
+                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label="Preview as reader"
+                            >
+                              <BookOpen size={13} />
                             </button>
                           </Link>
                           {book.approvalStatus === "pending" && (

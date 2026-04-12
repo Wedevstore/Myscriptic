@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 import { booksApi, wishlistApi } from "@/lib/api"
 import { syncWishlistWithServer } from "@/lib/wishlist-sync"
-import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
+import { apiBookToCard, normalizeApiBookRecord, type ApiBookRecord } from "@/lib/book-mapper"
 import { resolveBookSampleExcerpt } from "@/lib/book-sample-excerpts"
 import type { BookCardData } from "@/components/books/book-card"
 import { apiUrlConfigured, laravelAuthEnabled, laravelPhase2Enabled } from "@/lib/auth-mode"
@@ -114,6 +114,7 @@ function BookDetailContent() {
   const [remoteDesc, setRemoteDesc] = React.useState<string | null>(null)
   const [remoteSample, setRemoteSample] = React.useState<string | null>(null)
   const [remoteOpeningExcerpt, setRemoteOpeningExcerpt] = React.useState<string | null>(null)
+  const [remoteApiRecord, setRemoteApiRecord] = React.useState<ApiBookRecord | null>(null)
 
   React.useEffect(() => {
     if (!bookId) return
@@ -122,20 +123,24 @@ function BookDetailContent() {
     if (!liveBooks) {
       setRemote(null)
       setRemoteDesc(null)
+      setRemoteApiRecord(null)
       return
     }
     booksApi
       .get(bookId)
       .then(res => {
         const d = res.data as ApiBookRecord & { description?: string | null }
+        const normalized = normalizeApiBookRecord(d)
         setRemote(apiBookToCard(d))
         setRemoteDesc(d.description ?? null)
         setRemoteSample(d.sampleExcerpt ?? null)
         setRemoteOpeningExcerpt(d.openingExcerpt ?? null)
+        setRemoteApiRecord(normalized)
       })
       .catch(() => {
         setRemote(null)
         setRemoteDesc(null)
+        setRemoteApiRecord(null)
       })
   }, [bookId, liveBooks])
 
@@ -324,7 +329,7 @@ function BookDetailContent() {
     <div className="hidden lg:grid grid-cols-2 gap-3 w-full max-w-[220px]">
       {[
         { icon: Users, label: "Readers", value: extras.readCount.toLocaleString() },
-        { icon: Clock, label: "Pages", value: extras.pages.toString() },
+        { icon: Clock, label: remoteApiRecord?.chapterCount ? "Chapters" : "Pages", value: remoteApiRecord?.chapterCount ? String(remoteApiRecord.chapterCount) : extras.pages.toString() },
         { icon: Globe, label: "Language", value: extras.language },
         { icon: Star, label: "Rating", value: `${book.rating}/5.0` },
       ].map(s => (
@@ -464,8 +469,10 @@ function BookDetailContent() {
       {[
         { label: "Publisher", value: extras.publisher },
         { label: "Published", value: extras.publishedAt },
-        { label: "Pages", value: extras.pages.toString() },
+        { label: remoteApiRecord?.chapterCount ? "Chapters" : "Pages", value: remoteApiRecord?.chapterCount ? String(remoteApiRecord.chapterCount) : extras.pages.toString() },
         { label: "ISBN", value: extras.isbn },
+        ...(remoteApiRecord?.fileFormat ? [{ label: "Format", value: remoteApiRecord.fileFormat.toUpperCase() }] : []),
+        ...(remoteApiRecord?.fileSizeBytes ? [{ label: "File Size", value: `${(remoteApiRecord.fileSizeBytes / 1024 / 1024).toFixed(1)} MB` }] : []),
       ].map(m => (
         <div key={m.label}>
           <dt className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">{m.label}</dt>

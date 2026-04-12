@@ -19,6 +19,9 @@ export type ApiBookRecord = {
   category?: string | null
   isNew?: boolean
   isTrending?: boolean
+  chapterCount?: number | null
+  fileFormat?: string | null
+  fileSizeBytes?: number | null
 }
 
 function str(v: unknown): string | undefined {
@@ -92,6 +95,9 @@ export function normalizeApiBookRecord(raw: unknown): ApiBookRecord | null {
     category: str(o.category) ?? null,
     isNew: Boolean(o.is_new ?? o.isNew),
     isTrending: Boolean(o.is_trending ?? o.isTrending),
+    chapterCount: num(o.chapter_count ?? o.chapterCount),
+    fileFormat: str(o.file_format ?? o.fileFormat) ?? null,
+    fileSizeBytes: num(o.file_size_bytes ?? o.fileSizeBytes ?? o.file_size ?? o.fileSize),
   }
 }
 
@@ -104,6 +110,14 @@ const STREAM_KEYS = [
   "streamUrl",
   "audio_stream_url",
   "audioStreamUrl",
+  "signed_audio_url",
+  "signedAudioUrl",
+  "streaming_url",
+  "streamingUrl",
+  "media_url",
+  "mediaUrl",
+  "s3_audio_url",
+  "s3AudioUrl",
 ] as const
 
 /**

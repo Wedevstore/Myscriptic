@@ -403,6 +403,41 @@ export const booksApi = {
       method: "POST",
       body: JSON.stringify({ filename, mime_type: mimeType }),
     }),
+
+  /**
+   * Upload a file directly to S3 using a pre-signed PUT URL.
+   * Returns the S3 key to associate with the book record.
+   */
+  uploadToS3: async (file: File, onProgress?: (pct: number) => void) => {
+    const { url, key } = await booksApi.getSignedUploadUrl(file.name, file.type || "application/octet-stream")
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open("PUT", url, true)
+      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream")
+      if (onProgress) {
+        xhr.upload.addEventListener("progress", e => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+        })
+      }
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`S3 upload failed (${xhr.status})`)))
+      xhr.onerror = () => reject(new Error("Network error during S3 upload"))
+      xhr.send(file)
+    })
+    return { key }
+  },
+
+  /** Store parsed chapters for a book (POST /api/books/:id/chapters). */
+  saveChapters: (bookId: string, chapters: { index: number; title: string; content: string }[]) =>
+    request<{ success: boolean }>(`/books/${bookId}/chapters`, {
+      method: "POST",
+      body: JSON.stringify({ chapters }),
+    }),
+
+  /** Get cached chapters from the server (GET /api/books/:id/chapters). */
+  getChapters: (bookId: string) =>
+    request<{
+      data: { index: number; title: string; content: string }[] | null
+    }>(`/books/${bookId}/chapters`),
 }
 
 // ── Authors (public trending + authenticated follows) ─────────────────────────
@@ -1016,6 +1051,10 @@ export const libraryApi = {
    * POST /api/library/:bookId/signed-url
    * Response: { url: string; expires_at: string }
    * Security: URL expires in 15 minutes. Only granted to users with access.
+   *
+   * For **audiobooks**, the same endpoint should return a time-limited GET URL for the
+   * audio object in S3 (e.g. MP3/M4A) keyed by `audio_file_s3_key` — the web player at
+   * `/audio/[id]` calls this when the book payload has no direct `audio_url` / CDN field.
    */
   getSignedUrl: (bookId: string) =>
     request<{ url: string; expires_at: string }>(`/library/${bookId}/signed-url`, {

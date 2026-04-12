@@ -1,6 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+@plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
 
 :root {
   --background: 0 0% 100%;
@@ -145,5 +146,16 @@ body {
     .trending-marquee-track {
       animation: none;
     }
+  }
+
+  /* Reader typography (P3 item 17) */
+  .reader-typography {
+    hyphens: auto;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "liga" 1, "kern" 1;
+  }
+  .reader-typography.font-serif {
+    font-variant-numeric: oldstyle-nums;
   }
 }

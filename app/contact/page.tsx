@@ -17,7 +17,7 @@ import { laravelAuthEnabled } from "@/lib/auth-mode"
 import { resolveMockAuthorId } from "@/lib/mock-data"
 import {
   Mail, MessageSquare, Phone, MapPin, Clock,
-  Twitter, Instagram, Loader2, CheckCircle2,
+  Bird, Camera, Loader2, CheckCircle2,
 } from "lucide-react"
 
 const TOPICS = [
@@ -45,7 +45,7 @@ const CONTACT_CARDS = [
     href: "mailto:hello@myscriptic.com?subject=MyScriptic%20chat%20request",
   },
   {
-    icon: Twitter,
+    icon: Bird,
     title: "Twitter / X",
     detail: "@myscriptic",
     sub: "DMs open for quick questions",
@@ -285,10 +285,10 @@ function ContactPageContent() {
 
               <div className="flex gap-3 pt-2">
                 <a href="https://x.com/myscriptic" target="_blank" rel="noopener noreferrer" aria-label="Twitter / X" className="p-2 rounded-lg bg-muted hover:bg-accent border border-border transition-colors">
-                  <Twitter size={16} className="text-muted-foreground" />
+                  <Bird size={16} className="text-muted-foreground" />
                 </a>
                 <a href="https://instagram.com/myscriptic" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-2 rounded-lg bg-muted hover:bg-accent border border-border transition-colors">
-                  <Instagram size={16} className="text-muted-foreground" />
+                  <Camera size={16} className="text-muted-foreground" />
                 </a>
               </div>
             </div>

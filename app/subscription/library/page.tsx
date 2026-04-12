@@ -236,7 +236,7 @@ function LibraryBookCard({
         {/* Read button on hover */}
         {!isCompleted && (
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Link href={`/reader/${book.id}`}>
+            <Link href={book.format === "audiobook" ? `/audio/${book.id}` : `/reader/${book.id}`}>
               <Button size="sm" className="bg-brand hover:bg-brand-dark text-white gap-2 shadow-xl">
                 {book.format === "audiobook"
                   ? <><Play size={12} fill="currentColor" /> Listen</>
@@ -287,7 +287,10 @@ function LibraryBookCard({
         )}
 
         {/* CTA */}
-        <Link href={`/reader/${book.id}`} className="mt-auto pt-1">
+        <Link
+          href={book.format === "audiobook" ? `/audio/${book.id}` : `/reader/${book.id}`}
+          className="mt-auto pt-1"
+        >
           <Button
             variant="outline"
             size="sm"

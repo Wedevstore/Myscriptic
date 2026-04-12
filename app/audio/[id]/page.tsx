@@ -8,7 +8,8 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { booksApi } from "@/lib/api"
-import { apiBookToCard, pickAudiobookStreamUrl } from "@/lib/book-mapper"
+import { apiBookToCard } from "@/lib/book-mapper"
+import { resolveAudiobookStreamUrl } from "@/lib/audiobook-stream"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 import {
@@ -60,6 +61,17 @@ function AudioPlayerContent() {
   const [streamUrl, setStreamUrl] = React.useState<string | null>(null)
   const [audioDuration, setAudioDuration] = React.useState<number | null>(null)
   const audioRef = React.useRef<HTMLAudioElement | null>(null)
+  const [isPlaying, setIsPlaying] = React.useState(false)
+  const [progress, setProgress] = React.useState(0)
+  const [volume, setVolume] = React.useState(80)
+  const [muted, setMuted] = React.useState(false)
+  const [speed, setSpeed] = React.useState(1)
+  const [speedIdx, setSpeedIdx] = React.useState(1)
+  const [shuffled, setShuffled] = React.useState(false)
+  const [looping, setLooping] = React.useState(false)
+  const [activeChap, setActiveChap] = React.useState(0)
+  const [showChaps, setShowChaps] = React.useState(false)
+  const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
 
   const demoStream =
     (typeof process !== "undefined" && process.env.NEXT_PUBLIC_AUDIOBOOK_DEMO_STREAM_URL?.trim()) || ""
@@ -95,7 +107,7 @@ function AudioPlayerContent() {
     setMetaLoading(true)
     booksApi
       .get(routeId)
-      .then(res => {
+      .then(async res => {
         if (cancelled) return
         const payload = res.data as unknown
         const card = apiBookToCard(payload)
@@ -105,8 +117,11 @@ function AudioPlayerContent() {
           author: card.author,
           coverUrl: card.coverUrl,
         })
-        const fromApi = pickAudiobookStreamUrl(payload)
-        setStreamUrl(fromApi || demoStream || null)
+        const url = await resolveAudiobookStreamUrl(payload, card.id, {
+          tryLibrarySignedUrl: true,
+        })
+        if (cancelled) return
+        setStreamUrl(url || demoStream || null)
       })
       .catch(() => {
         if (!cancelled) {
@@ -126,18 +141,6 @@ function AudioPlayerContent() {
   const simTotalDuration = React.useMemo(() => chapterListTotalSeconds(), [])
   const totalPlaySeconds =
     streamUrl && audioDuration && audioDuration > 0 ? audioDuration : simTotalDuration
-
-  const [isPlaying,  setIsPlaying]  = React.useState(false)
-  const [progress,   setProgress]   = React.useState(0)   // 0–100
-  const [volume,     setVolume]     = React.useState(80)
-  const [muted,      setMuted]      = React.useState(false)
-  const [speed,      setSpeed]      = React.useState(1)
-  const [speedIdx,   setSpeedIdx]   = React.useState(1)
-  const [shuffled,   setShuffled]   = React.useState(false)
-  const [looping,    setLooping]    = React.useState(false)
-  const [activeChap, setActiveChap] = React.useState(0)
-  const [showChaps,  setShowChaps]  = React.useState(false)
-  const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
