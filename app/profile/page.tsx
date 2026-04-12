@@ -43,6 +43,12 @@ function isAppLocale(s: string): s is AppLocale {
   return APP_LOCALES.some(l => l.value === s)
 }
 
+function formatMemberSince(iso: string) {
+  if (!iso?.trim()) return "—"
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+}
+
 function ProfileContent() {
   const { user, isAuthenticated, isLoading, updateUser, logout } = useAuth()
   const { theme, setTheme } = useTheme()
@@ -347,7 +353,7 @@ function ProfileContent() {
                 <Label htmlFor="profile-joined">Member Since</Label>
                 <Input
                   id="profile-joined"
-                  value={new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  value={formatMemberSince(user.createdAt)}
                   disabled
                   className="opacity-60"
                 />

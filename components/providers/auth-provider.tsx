@@ -121,6 +121,9 @@ export function normalizeAuthUser(raw: unknown): AuthUser {
     u.two_factor_enabled === true || u.twoFactorEnabled === true ? true : undefined
   const permissions = Array.isArray(u.permissions) ? u.permissions.map(String) : undefined
   const appStatus = u.author_application_status ?? u.authorApplicationStatus
+  const createdRaw = u.created_at ?? u.createdAt
+  const createdAt =
+    createdRaw != null && String(createdRaw).trim() !== "" ? String(createdRaw) : ""
   return {
     id: String(u.id),
     name: String(u.name),
@@ -129,12 +132,14 @@ export function normalizeAuthUser(raw: unknown): AuthUser {
     role: u.role as UserRole,
     permissions,
     subscriptionPlan:
-      u.subscriptionPlan != null ? (u.subscriptionPlan as string | null) : undefined,
-    subscriptionExpiresAt:
-      u.subscriptionExpiresAt != null
-        ? (u.subscriptionExpiresAt as string | null)
+      (u.subscription_plan ?? u.subscriptionPlan) != null
+        ? ((u.subscription_plan ?? u.subscriptionPlan) as string | null)
         : undefined,
-    createdAt: String(u.createdAt),
+    subscriptionExpiresAt:
+      (u.subscription_expires_at ?? u.subscriptionExpiresAt) != null
+        ? ((u.subscription_expires_at ?? u.subscriptionExpiresAt) as string | null)
+        : undefined,
+    createdAt,
     twoFactorEnabled,
     authorApplicationStatus:
       typeof appStatus === "string" && ["pending", "approved", "rejected"].includes(appStatus)
