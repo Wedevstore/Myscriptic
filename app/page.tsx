@@ -21,7 +21,7 @@ import { apiUrlConfigured } from "@/lib/auth-mode"
 import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { cmsSectionStore, seedP4, type CmsSection } from "@/lib/store-p4"
 import type { CmsHomepageSection } from "@/lib/cms-homepage"
-import { shouldTryCmsHomepageApi } from "@/lib/cms-homepage"
+import { countCmsResolvedBooks, shouldTryCmsHomepageApi } from "@/lib/cms-homepage"
 
 const AdBanner = dynamic(
   () => import("@/components/ads/ad-banner").then(m => ({ default: m.AdBanner })),
@@ -91,6 +91,55 @@ async function fetchLiveHomeBooks(): Promise<HomeBookSections> {
 function sectionActive(sections: CmsSection[], type: string) {
   const s = sections.find(s => s.type === type)
   return s ? s.isActive : true
+}
+
+/** Book rails from `fetchLiveHomeBooks` when CMS homepage has no resolved `book` payloads. */
+function HomepageLiveBookRails({ books }: { books: HomeBookSections }) {
+  return (
+    <>
+      {books.trendingBooks.length > 0 && (
+        <BookSection
+          title="Trending This Week"
+          subtitle="Most-read books by the MyScriptic community"
+          books={books.trendingBooks}
+          seeAllHref="/books?sort=trending"
+          columns={4}
+        />
+      )}
+      {books.newArrivals.length > 0 && (
+        <BookSection
+          title="New Arrivals"
+          subtitle="Fresh titles added this month"
+          books={books.newArrivals}
+          seeAllHref="/books?sort=new"
+          columns={4}
+        />
+      )}
+      <BookSection
+        title="Read with Subscription"
+        subtitle="Unlimited access with any plan"
+        books={books.subscriptionBooks}
+        seeAllHref="/books?access=subscription"
+        variant="scroll"
+        columns={6}
+      />
+      <SubscriptionBanner />
+      <BookSection
+        title="Top Audiobooks"
+        subtitle="Listen on the go"
+        books={books.audiobooks}
+        seeAllHref="/audiobooks"
+        columns={4}
+      />
+      <BookSection
+        title="Free to Read"
+        subtitle="Start reading right now — no subscription needed"
+        books={books.freeBooks}
+        seeAllHref="/books?access=free"
+        columns={4}
+      />
+    </>
+  )
 }
 
 function MockHomeContent({
@@ -214,9 +263,38 @@ function HomeContent() {
   }, [])
 
   if (cmsSections && !cmsFailed) {
+    const cmsBooksResolved = countCmsResolvedBooks(cmsSections)
+    if (cmsBooksResolved > 0) {
+      return (
+        <main id="main-content" className="flex-1 pt-16">
+          <CmsDynamicHome sections={cmsSections} />
+          <TrendingAuthors />
+        </main>
+      )
+    }
+
+    // CMS returned sections (e.g. hero) but book_list items have no `book` — use catalog API for rails.
+    if (apiUrlConfigured() && !liveBooksReady) {
+      return (
+        <main id="main-content" className="flex-1 pt-16 flex items-center justify-center min-h-[50vh]">
+          <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+        </main>
+      )
+    }
+
+    const emptyRails: HomeBookSections = {
+      trendingBooks: [],
+      newArrivals: [],
+      freeBooks: [],
+      audiobooks: [],
+      subscriptionBooks: [],
+    }
+    const fallbackRails = allowMockCatalogFallback() ? DEFAULT_HOME_BOOKS : emptyRails
+
     return (
       <main id="main-content" className="flex-1 pt-16">
         <CmsDynamicHome sections={cmsSections} />
+        <HomepageLiveBookRails books={liveBooks ?? fallbackRails} />
         <TrendingAuthors />
       </main>
     )

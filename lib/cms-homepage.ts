@@ -56,6 +56,23 @@ export function shouldTryCmsHomepageApi(): boolean {
   return true
 }
 
+/**
+ * Counts CMS items that already include an embedded `book` payload.
+ * When this is 0 but `book_list` sections exist, the API returned slots without
+ * resolving `book_id` → the client should fall back to live catalog fetches.
+ */
+export function countCmsResolvedBooks(sections: CmsHomepageSection[] | null | undefined): number {
+  if (!sections?.length) return 0
+  let n = 0
+  for (const s of sections) {
+    if (s.section_type !== "book_list" || !s.is_active) continue
+    for (const item of s.items) {
+      if (item.book != null) n++
+    }
+  }
+  return n
+}
+
 export function resolveCmsLink(linkType: string | null, linkValue: string | null): string {
   if (!linkType || !linkValue) return "#"
   switch (linkType) {
