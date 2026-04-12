@@ -49,6 +49,7 @@ type AuthorRow = {
   books: number
   followers: number
   avatar: string
+  genres?: string[]
 }
 
 function AuthorsContent() {
@@ -119,7 +120,11 @@ function AuthorsContent() {
   }
 
   const filtered = authors
-    .filter(a => !search || a.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(a => {
+      if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false
+      if (genre !== "All" && !a.genres?.some((g: string) => g === genre)) return false
+      return true
+    })
     .sort((a, b) => {
       if (sort === "followers") return b.followers - a.followers
       if (sort === "books")     return b.books - a.books

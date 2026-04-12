@@ -41,7 +41,7 @@ const STATUS_META: Record<OrderStatus, { label: string; icon: React.ElementType;
 
 // ── order card ────────────────────────────────────────────────────────────────
 
-function OrderCard({ order }: { order: Order }) {
+function OrderCard({ order, onRefundRequest }: { order: Order; onRefundRequest: (orderId: string) => void }) {
   const meta = STATUS_META[order.status]
   const StatusIcon = meta.icon
   const sym = CURRENCY_SYMBOLS[order.currency]
@@ -126,6 +126,7 @@ function OrderCard({ order }: { order: Order }) {
             size="sm"
             variant="ghost"
             className="h-7 text-xs text-muted-foreground hover:text-destructive gap-1.5"
+            onClick={() => onRefundRequest(order.id)}
           >
             <RefreshCw size={12} /> Request Refund
           </Button>
@@ -155,6 +156,17 @@ function OrdersContent() {
   const [orders, setOrders] = React.useState<Order[]>([])
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
+  const [refundingId, setRefundingId] = React.useState<string | null>(null)
+
+  const handleRefundRequest = (orderId: string) => {
+    const ok = window.confirm("Request a refund for this order? This may take 3–5 business days.")
+    if (!ok) return
+    setRefundingId(orderId)
+    setOrders(prev =>
+      prev.map(o => (o.id === orderId ? { ...o, status: "refunded" as OrderStatus } : o))
+    )
+    setTimeout(() => setRefundingId(null), 1500)
+  }
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -307,7 +319,7 @@ function OrdersContent() {
       ) : (
         <div className="space-y-5">
           {filtered.map(order => (
-            <OrderCard key={order.id} order={order} />
+            <OrderCard key={order.id} order={order} onRefundRequest={handleRefundRequest} />
           ))}
         </div>
       )}

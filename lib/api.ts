@@ -288,6 +288,19 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  changePassword: (body: {
+    current_password: string
+    password: string
+    password_confirmation: string
+  }) =>
+    request<{ message?: string }>("/auth/password", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  deleteMe: () =>
+    request<void>("/auth/me", { method: "DELETE" }),
 }
 
 // ── Public contact ────────────────────────────────────────────────────────────

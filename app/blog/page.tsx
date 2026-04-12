@@ -99,6 +99,16 @@ const CATEGORY_COLOR: Record<string, string> = {
 function BlogContent() {
   const [query, setQuery] = React.useState("")
   const [activeCategory, setActiveCategory] = React.useState("All")
+  const [nlEmail, setNlEmail] = React.useState("")
+  const [nlDone, setNlDone] = React.useState(false)
+
+  const handleNewsletterSubscribe = () => {
+    if (!nlEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nlEmail)) return
+    const stored: string[] = JSON.parse(localStorage.getItem("myscriptic-newsletter") ?? "[]")
+    if (!stored.includes(nlEmail)) stored.push(nlEmail)
+    localStorage.setItem("myscriptic-newsletter", JSON.stringify(stored))
+    setNlDone(true)
+  }
 
   const featured = POSTS.find(p => p.featured)
   const filtered = POSTS.filter(p => {
@@ -247,12 +257,27 @@ function BlogContent() {
             <h2 className="text-2xl font-serif font-bold text-foreground mb-2">Get the latest posts in your inbox</h2>
             <p className="text-muted-foreground text-sm">Weekly digest of the best articles, author tips, and platform updates.</p>
           </div>
-          <div className="flex gap-3 w-full sm:w-auto">
-            <Input placeholder="your@email.com" className="h-11 min-w-[220px]" type="email" />
-            <Button className="bg-brand hover:bg-brand-dark text-primary-foreground h-11 px-6 shrink-0">
-              Subscribe
-            </Button>
-          </div>
+          {nlDone ? (
+            <p className="text-sm text-green-600 dark:text-green-400 font-semibold shrink-0">Subscribed!</p>
+          ) : (
+            <div className="flex gap-3 w-full sm:w-auto">
+              <Input
+                placeholder="your@email.com"
+                className="h-11 min-w-[220px]"
+                type="email"
+                value={nlEmail}
+                onChange={e => setNlEmail(e.target.value)}
+                aria-label="Email for newsletter"
+              />
+              <Button
+                type="button"
+                className="bg-brand hover:bg-brand-dark text-primary-foreground h-11 px-6 shrink-0"
+                onClick={handleNewsletterSubscribe}
+              >
+                Subscribe
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </>

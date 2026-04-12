@@ -672,7 +672,12 @@ function SubscriptionsContent() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => window.alert(`Subscription ${sub.id}: ${sub.plan} for ${sub.user}.\n\nFull management requires the admin API (cancel / extend / refund). This data is demo-only.`)}
+                          >
                             Manage
                           </Button>
                         </td>

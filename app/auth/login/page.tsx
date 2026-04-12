@@ -58,17 +58,22 @@ function LoginPageInner() {
       return
     }
     setLoading(true)
-    const result = await login(form.email, form.password)
-    setLoading(false)
-    if (result.success) {
-      goAfterLogin()
-    } else if ("needsTwoFactor" in result && result.needsTwoFactor) {
-      setPendingToken(result.pendingToken)
-      setStep("2fa")
-      setTwoFactorCode("")
-      setError("")
-    } else {
-      setError((result as { success: false; error?: string }).error ?? "Login failed.")
+    try {
+      const result = await login(form.email, form.password)
+      if (result.success) {
+        goAfterLogin()
+      } else if ("needsTwoFactor" in result && result.needsTwoFactor) {
+        setPendingToken(result.pendingToken)
+        setStep("2fa")
+        setTwoFactorCode("")
+        setError("")
+      } else {
+        setError((result as { success: false; error?: string }).error ?? "Login failed.")
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Login failed.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -81,10 +86,15 @@ function LoginPageInner() {
     }
     setLoading(true)
     setError("")
-    const r = await verifyLoginTwoFactor(pendingToken, clean)
-    setLoading(false)
-    if (r.success) goAfterLogin()
-    else setError(r.error ?? "Invalid code.")
+    try {
+      const r = await verifyLoginTwoFactor(pendingToken, clean)
+      if (r.success) goAfterLogin()
+      else setError(r.error ?? "Invalid code.")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Verification failed.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   const backToPassword = () => {

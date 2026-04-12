@@ -87,7 +87,11 @@ function saveToStorage(user: AuthUser | null, token: string | null) {
 const PIC = (seed: string, w: number, h: number) =>
   `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`
 
-// Seed mock accounts (also sign in against the API when Laravel is running)
+/**
+ * Demo-only mock accounts for offline / non-Laravel development.
+ * When `laravelAuthEnabled()` is true (production), these are never consulted —
+ * login goes through the API and `findMockUser` is skipped entirely.
+ */
 const MOCK_USERS: (AuthUser & { password: string })[] = [
   {
     id: "usr_admin_1",

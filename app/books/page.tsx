@@ -88,6 +88,14 @@ function BooksContent() {
   React.useEffect(() => {
     const q = searchParams.get("q")
     if (q) setQuery(q)
+    const cat = searchParams.get("category")
+    if (cat) setActiveCategory(cat)
+    const s = searchParams.get("sort")
+    if (s && ["trending", "latest", "price_low", "price_high", "top_rated"].includes(s)) setSortBy(s as SortOption)
+    const acc = searchParams.get("access")
+    if (acc && ["ALL", "FREE", "PAID", "SUBSCRIPTION"].includes(acc.toUpperCase())) setFilterAccess(acc.toUpperCase() as FilterAccess)
+    const fmt = searchParams.get("format")
+    if (fmt && ["ALL", "ebook", "audiobook"].includes(fmt)) setFilterFormat(fmt as FilterFormat)
   }, [searchParams])
 
   React.useEffect(() => {

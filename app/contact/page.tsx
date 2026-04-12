@@ -288,10 +288,10 @@ function ContactPageContent() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <a href="#" aria-label="Twitter" className="p-2 rounded-lg bg-muted hover:bg-accent border border-border transition-colors">
+                <a href="https://x.com/myscriptic" target="_blank" rel="noopener noreferrer" aria-label="Twitter / X" className="p-2 rounded-lg bg-muted hover:bg-accent border border-border transition-colors">
                   <Twitter size={16} className="text-muted-foreground" />
                 </a>
-                <a href="#" aria-label="Instagram" className="p-2 rounded-lg bg-muted hover:bg-accent border border-border transition-colors">
+                <a href="https://instagram.com/myscriptic" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-2 rounded-lg bg-muted hover:bg-accent border border-border transition-colors">
                   <Instagram size={16} className="text-muted-foreground" />
                 </a>
               </div>

@@ -608,7 +608,16 @@ function SalesContent() {
             <div className="bg-card border border-border rounded-xl p-5">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="font-semibold text-foreground">Monthly Sales Revenue</h2>
-                <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1.5"
+                  onClick={() => {
+                    const csv = ["Month,Revenue,Net"].concat(MONTHLY_SALES.map(r => `${r.month},${r.revenue},${r.net}`)).join("\n")
+                    const blob = new Blob([csv], { type: "text/csv" })
+                    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "sales-revenue.csv"; a.click()
+                  }}
+                >
                   <Download size={11} /> Export CSV
                 </Button>
               </div>
@@ -723,7 +732,17 @@ function SalesContent() {
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between">
               <h2 className="font-semibold text-foreground">Recent Transactions</h2>
-              <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => {
+                  const hdr = "Buyer,Book,Amount,Net,Gateway,Date,Status"
+                  const rows = txnRows.map(t => `${t.buyer},${t.bookTitle},$${t.amount},$${t.net},${t.gateway},${t.date},${t.status}`)
+                  const blob = new Blob([hdr + "\n" + rows.join("\n")], { type: "text/csv" })
+                  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "transactions.csv"; a.click()
+                }}
+              >
                 <Download size={11} /> Export
               </Button>
             </div>

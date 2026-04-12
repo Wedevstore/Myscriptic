@@ -195,5 +195,15 @@ function ForgotPasswordContent() {
 }
 
 export default function ForgotPasswordPage() {
-  return <ForgotPasswordContent />
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-brand" aria-label="Loading" />
+        </div>
+      }
+    >
+      <ForgotPasswordContent />
+    </React.Suspense>
+  )
 }

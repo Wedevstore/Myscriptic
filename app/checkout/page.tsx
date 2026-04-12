@@ -97,6 +97,7 @@ function CheckoutContent() {
   const [provider,   setProvider]   = React.useState<PaymentProvider>("paystack")
   const [currency,   setCurrency]   = React.useState<Currency>("USD")
   const [processing, setProcessing] = React.useState(false)
+  const [payError, setPayError] = React.useState<string | null>(null)
 
   const [cardNumber, setCardNumber] = React.useState("")
   const [cardExpiry, setCardExpiry] = React.useState("")
@@ -199,6 +200,7 @@ function CheckoutContent() {
   const handlePay = async () => {
     if (!user) return
     setProcessing(true)
+    setPayError(null)
 
     if (phase2) {
       try {
@@ -211,7 +213,8 @@ function CheckoutContent() {
         })
         sessionStorage.removeItem("ms_applied_coupon")
         window.location.href = res.payment_url
-      } catch {
+      } catch (e) {
+        setPayError(e instanceof Error ? e.message : "Payment failed. Please try again.")
         setProcessing(false)
       }
       return
@@ -453,6 +456,12 @@ function CheckoutContent() {
                   256-bit SSL encryption. Your payment info is never stored on our servers.
                 </p>
               </div>
+
+              {payError && (
+                <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mb-1">
+                  {payError}
+                </p>
+              )}
 
               <Button
                 className="w-full bg-brand hover:bg-brand-dark text-primary-foreground font-semibold h-12 gap-2"

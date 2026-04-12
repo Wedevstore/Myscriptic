@@ -1,10 +1,12 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { safeInternalPath } from "@/lib/safe-internal-path"
 import { useAuth, type UserRole } from "@/components/providers/auth-provider"
+import { SocialLoginButtons } from "@/components/auth/social-login-buttons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -41,7 +43,7 @@ function PasswordStrength({ password }: { password: string }) {
   )
 }
 
-export default function RegisterPage() {
+function RegisterPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { register, isAuthenticated } = useAuth()
@@ -56,6 +58,10 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState("")
+
+  const goAfterRegister = React.useCallback(() => {
+    router.push(afterRegister)
+  }, [router, afterRegister])
 
   React.useEffect(() => {
     if (isAuthenticated) router.replace(afterRegister)
@@ -72,10 +78,15 @@ export default function RegisterPage() {
     if (form.password !== form.confirmPassword) { setError("Passwords do not match."); return }
     if (form.password.length < 8) { setError("Password must be at least 8 characters."); return }
     setLoading(true)
-    const result = await register(form.name, form.email, form.password, role)
-    setLoading(false)
-    if (!result.success) setError(result.error ?? "Registration failed.")
-    else router.push(afterRegister)
+    try {
+      const result = await register(form.name, form.email, form.password, role)
+      if (!result.success) setError(result.error ?? "Registration failed.")
+      else router.push(afterRegister)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Registration failed.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -229,10 +240,7 @@ export default function RegisterPage() {
             <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">or</span>
           </div>
 
-          <Button variant="outline" className="w-full gap-2 h-11">
-            <BookOpen size={16} />
-            Continue with Google
-          </Button>
+          <SocialLoginButtons disabled={loading} onSocialSuccess={goAfterRegister} />
 
           <p className="text-center text-sm text-muted-foreground mt-6">
             Already have an account?{" "}
@@ -246,5 +254,19 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-brand" aria-label="Loading" />
+        </div>
+      }
+    >
+      <RegisterPageInner />
+    </Suspense>
   )
 }

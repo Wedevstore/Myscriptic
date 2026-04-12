@@ -124,12 +124,9 @@ export default function PressPage() {
               <h2 className="text-2xl font-serif font-bold text-foreground mb-8">As Seen In</h2>
               <div className="grid sm:grid-cols-2 gap-6">
                 {PRESS_MENTIONS.map(mention => (
-                  <a
+                  <div
                     key={mention.publication}
-                    href={mention.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-card border border-border rounded-xl p-6 hover:border-brand/30 transition-all group"
+                    className="bg-card border border-border rounded-xl p-6 hover:border-brand/30 transition-all"
                   >
                     <div className="flex items-start justify-between gap-4 mb-4">
                       <div className="px-3 py-1 bg-muted rounded-lg text-sm font-bold text-foreground">
@@ -143,7 +140,7 @@ export default function PressPage() {
                     <blockquote className="text-muted-foreground leading-relaxed italic text-sm">
                       &ldquo;{mention.quote}&rdquo;
                     </blockquote>
-                  </a>
+                  </div>
                 ))}
               </div>
             </div>
@@ -156,12 +153,12 @@ export default function PressPage() {
               {PRESS_RELEASES.map(pr => (
                 <div
                   key={pr.title}
-                  className="flex items-start gap-5 p-5 bg-card border border-border rounded-xl hover:border-brand/30 transition-all cursor-pointer group"
+                  className="flex items-start gap-5 p-5 bg-card border border-border rounded-xl transition-all"
                 >
                   <div className="w-2 h-2 rounded-full bg-brand mt-2 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <h3 className="font-semibold text-foreground group-hover:text-brand transition-colors text-balance">
+                      <h3 className="font-semibold text-foreground text-balance">
                         {pr.title}
                       </h3>
                       <span className="text-xs text-muted-foreground shrink-0">{pr.date}</span>

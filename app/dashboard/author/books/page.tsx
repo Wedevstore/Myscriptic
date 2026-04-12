@@ -406,8 +406,10 @@ function AuthorBooksContent() {
                               <Eye size={13} /> View Public Page
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-                            <Pencil size={13} /> Edit Book
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/author/books/new?edit=${book.id}`} className="flex items-center gap-2 cursor-pointer">
+                              <Pencil size={13} /> Edit Book
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem

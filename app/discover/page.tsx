@@ -309,14 +309,16 @@ function DiscoverContent() {
         {/* Quick category filters */}
         <div className="flex flex-wrap gap-2 mb-10">
           {CATEGORIES.map(cat => (
-            <Link key={cat.id} href={`/books?category=${cat.label}`}>
-              <button className={cn(
+            <Link
+              key={cat.id}
+              href={`/books?category=${cat.label}`}
+              className={cn(
                 "px-4 py-2 rounded-full border text-sm font-medium transition-all hover:border-brand hover:text-brand",
                 "border-border text-muted-foreground"
-              )}>
-                {cat.label}
-                <span className="ml-1.5 text-xs text-muted-foreground/60">{(cat.count / 1000).toFixed(1)}k</span>
-              </button>
+              )}
+            >
+              {cat.label}
+              <span className="ml-1.5 text-xs text-muted-foreground/60">{(cat.count / 1000).toFixed(1)}k</span>
             </Link>
           ))}
         </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { Navbar } from "@/components/layout/navbar"
 import { Footer } from "@/components/layout/footer"
 import { Providers } from "@/components/providers"
@@ -235,9 +236,11 @@ function SalesContent() {
 
         {/* Load more */}
         <div className="text-center mt-10">
-          <Button variant="outline" className="gap-2 hover:border-brand hover:text-brand px-8">
-            Load More Deals <ChevronRight size={14} />
-          </Button>
+          <Link href="/books">
+            <Button variant="outline" className="gap-2 hover:border-brand hover:text-brand px-8">
+              Browse All Books <ChevronRight size={14} />
+            </Button>
+          </Link>
         </div>
 
         {/* Coupon section */}
@@ -256,9 +259,11 @@ function SalesContent() {
               <div className="font-mono text-3xl font-black text-brand bg-brand/10 border-2 border-brand/20 border-dashed rounded-xl px-8 py-4 tracking-widest">
                 FLASH20
               </div>
-              <Button className="bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2">
-                Shop Now <ChevronRight size={14} />
-              </Button>
+              <Link href="/books">
+                <Button className="bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2">
+                  Shop Now <ChevronRight size={14} />
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

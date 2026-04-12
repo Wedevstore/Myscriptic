@@ -53,6 +53,11 @@ function ProfileContent() {
   const [saving, setSaving] = React.useState(false)
   const [locale, setLocale] = React.useState<AppLocale>("en")
   const [preferencesSaved, setPreferencesSaved] = React.useState(false)
+  const [pwForm, setPwForm] = React.useState({ current: "", next: "", confirm: "" })
+  const [pwLoading, setPwLoading] = React.useState(false)
+  const [pwMsg, setPwMsg] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [notifSaved, setNotifSaved] = React.useState(false)
+  const [deleteLoading, setDeleteLoading] = React.useState(false)
   const [subscriptionActionLoading, setSubscriptionActionLoading] = React.useState(false)
   const [subscriptionActionMessage, setSubscriptionActionMessage] = React.useState<{
     type: "success" | "error"
@@ -77,6 +82,13 @@ function ProfileContent() {
   }, [user])
 
   React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem("myscriptic-notif-prefs")
+      if (raw) setNotifPrefs(JSON.parse(raw))
+    } catch { /* ignore corrupt data */ }
+  }, [])
+
+  React.useEffect(() => {
     const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
     const next: AppLocale = stored && isAppLocale(stored) ? stored : "en"
     setLocale(next)
@@ -92,6 +104,65 @@ function ProfileContent() {
     setLocale(next)
     setPreferencesSaved(true)
     window.setTimeout(() => setPreferencesSaved(false), 2500)
+  }
+
+  const handleUpdatePassword = async () => {
+    setPwMsg(null)
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) {
+      setPwMsg({ type: "error", text: "Please fill in all password fields." })
+      return
+    }
+    if (pwForm.next.length < 8) {
+      setPwMsg({ type: "error", text: "New password must be at least 8 characters." })
+      return
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      setPwMsg({ type: "error", text: "New passwords do not match." })
+      return
+    }
+    setPwLoading(true)
+    try {
+      if (apiUrlConfigured() && laravelAuthEnabled()) {
+        await authApi.changePassword({
+          current_password: pwForm.current,
+          password: pwForm.next,
+          password_confirmation: pwForm.confirm,
+        })
+      } else {
+        await new Promise(r => setTimeout(r, 700))
+      }
+      setPwForm({ current: "", next: "", confirm: "" })
+      setPwMsg({ type: "success", text: "Password updated." })
+    } catch (e) {
+      setPwMsg({ type: "error", text: e instanceof Error ? e.message : "Could not update password." })
+    } finally {
+      setPwLoading(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    const ok = window.confirm(
+      "Are you sure you want to permanently delete your account? This cannot be undone."
+    )
+    if (!ok) return
+    setDeleteLoading(true)
+    try {
+      if (apiUrlConfigured() && laravelAuthEnabled()) {
+        await authApi.deleteMe()
+      }
+      logout()
+      router.push("/")
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Could not delete account.")
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleSaveNotifPrefs = () => {
+    localStorage.setItem("myscriptic-notif-prefs", JSON.stringify(notifPrefs))
+    setNotifSaved(true)
+    window.setTimeout(() => setNotifSaved(false), 2500)
   }
 
   async function syncSubscriptionFromApi(): Promise<void> {
@@ -304,18 +375,43 @@ function ProfileContent() {
             <div className="space-y-5">
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-3">Change Password</h3>
+                {pwMsg && (
+                  <Alert
+                    variant={pwMsg.type === "error" ? "destructive" : "default"}
+                    className={cn("mb-4 max-w-sm", pwMsg.type === "success" && "border-green-200 bg-green-50 text-green-900 dark:border-green-800/50 dark:bg-green-900/20 dark:text-green-200")}
+                  >
+                    <AlertDescription>{pwMsg.text}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="space-y-4 max-w-sm">
-                  {["Current Password", "New Password", "Confirm New Password"].map((lbl, i) => (
-                    <div key={lbl} className="space-y-1.5">
-                      <Label>{lbl}</Label>
+                  {([
+                    { label: "Current Password", key: "current" as const, id: "pw-current" },
+                    { label: "New Password", key: "next" as const, id: "pw-next" },
+                    { label: "Confirm New Password", key: "confirm" as const, id: "pw-confirm" },
+                  ]).map(field => (
+                    <div key={field.key} className="space-y-1.5">
+                      <Label htmlFor={field.id}>{field.label}</Label>
                       <div className="relative">
                         <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="password" placeholder="••••••••" className="pl-9" />
+                        <Input
+                          id={field.id}
+                          type="password"
+                          autoComplete={field.key === "current" ? "current-password" : "new-password"}
+                          placeholder="••••••••"
+                          className="pl-9"
+                          value={pwForm[field.key]}
+                          onChange={e => { setPwMsg(null); setPwForm(f => ({ ...f, [field.key]: e.target.value })) }}
+                        />
                       </div>
                     </div>
                   ))}
-                  <Button className="bg-brand hover:bg-brand-dark text-primary-foreground">
-                    Update Password
+                  <Button
+                    type="button"
+                    className="bg-brand hover:bg-brand-dark text-primary-foreground"
+                    disabled={pwLoading}
+                    onClick={handleUpdatePassword}
+                  >
+                    {pwLoading ? <><Loader2 size={14} className="animate-spin mr-2" /> Updating…</> : "Update Password"}
                   </Button>
                 </div>
               </div>
@@ -338,8 +434,14 @@ function ProfileContent() {
                       Permanently delete your account and all associated data. This cannot be undone.
                     </p>
                   </div>
-                  <Button variant="destructive" size="sm" className="shrink-0 gap-2">
-                    <Trash2 size={13} /> Delete
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="shrink-0 gap-2"
+                    disabled={deleteLoading}
+                    onClick={handleDeleteAccount}
+                  >
+                    {deleteLoading ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Delete
                   </Button>
                 </div>
               </div>
@@ -384,8 +486,19 @@ function ProfileContent() {
                 </div>
               ))}
             </div>
-            <div className="flex justify-end pt-2 border-t border-border">
-              <Button className="bg-brand hover:bg-brand-dark text-primary-foreground">Save Preferences</Button>
+            <div className="flex justify-end items-center gap-3 pt-2 border-t border-border">
+              {notifSaved && (
+                <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5 shrink-0">
+                  <CheckCircle size={14} aria-hidden /> Saved
+                </span>
+              )}
+              <Button
+                type="button"
+                className="bg-brand hover:bg-brand-dark text-primary-foreground"
+                onClick={handleSaveNotifPrefs}
+              >
+                Save Preferences
+              </Button>
             </div>
           </div>
         </TabsContent>
