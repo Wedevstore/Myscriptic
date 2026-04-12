@@ -47,6 +47,15 @@ const MOCK_REVIEWS = [
 
 const INITIAL_REVIEW_VISIBLE = 3
 
+type ReviewItem = {
+  id: string
+  user: string
+  avatar: string
+  rating: number
+  date: string
+  comment: string
+}
+
 const BOOK_EXTRAS: Record<string, {
   description: string
   pages: number
@@ -116,6 +125,16 @@ function BookDetailContent() {
   const [remoteSample, setRemoteSample] = React.useState<string | null>(null)
   const [remoteOpeningExcerpt, setRemoteOpeningExcerpt] = React.useState<string | null>(null)
   const [remoteApiRecord, setRemoteApiRecord] = React.useState<ApiBookRecord | null>(null)
+  const [wishlisted, setWishlisted] = React.useState(false)
+  const [wishBusy, setWishBusy] = React.useState(false)
+  const [inCart, setInCart] = React.useState(false)
+  const [addedToast, setAddedToast] = React.useState(false)
+  const [cartBusy, setCartBusy] = React.useState(false)
+  const [shareHint, setShareHint] = React.useState(false)
+  const [related, setRelated] = React.useState<BookCardData[]>([])
+  const [reviewsVisible, setReviewsVisible] = React.useState(INITIAL_REVIEW_VISIBLE)
+  const [liveReviews, setLiveReviews] = React.useState<ReviewItem[]>([])
+  const [reviewsFetched, setReviewsFetched] = React.useState(false)
 
   React.useEffect(() => {
     if (!bookId) return
@@ -147,6 +166,94 @@ function BookDetailContent() {
 
   const mockFb = allowMockCatalogFallback()
   const book = remote ?? (mockFb ? (MOCK_BOOKS.find(b => b.id === bookId) ?? MOCK_BOOKS[0]) : null)
+
+  React.useEffect(() => {
+    if (!bookId || !liveBooks) return
+    let cancelled = false
+    reviewsApi
+      .list(bookId)
+      .then(res => {
+        if (cancelled) return
+        const rows = Array.isArray(res?.data) ? res.data : []
+        const mapped: ReviewItem[] = rows.map((r: unknown) => {
+          const row = r as Record<string, unknown>
+          return {
+            id: String(row.id ?? row.review_id ?? Math.random()),
+            user: String(row.user_name ?? row.author_name ?? row.userName ?? "Reader"),
+            avatar: String(row.user_name ?? row.author_name ?? "R").slice(0, 2).toUpperCase(),
+            rating: Number(row.rating ?? 5),
+            date: row.created_at ? new Date(String(row.created_at)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
+            comment: String(row.comment ?? row.body ?? ""),
+          }
+        })
+        setLiveReviews(mapped)
+        setReviewsFetched(true)
+      })
+      .catch(() => setReviewsFetched(true))
+    return () => { cancelled = true }
+  }, [bookId, liveBooks])
+
+  React.useEffect(() => {
+    if (!book?.id) {
+      setRelated([])
+      return
+    }
+    const fb = MOCK_BOOKS.filter(b => b.category === book.category && b.id !== book.id).slice(0, 6)
+    setRelated(fb)
+    if (!liveBooks) return
+    let cancelled = false
+    booksApi
+      .list({ category: book.category, per_page: "12" })
+      .then(res => {
+        if (cancelled) return
+        const raw = res?.data
+        const list = Array.isArray(raw) ? raw : []
+        const rows = list.map(row => apiBookToCard(row as ApiBookRecord)).filter(b => b.id !== book.id).slice(0, 6)
+        if (rows.length) setRelated(rows)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [book?.id, book?.category, liveBooks])
+
+  React.useEffect(() => {
+    if (!book?.id) return
+    setWishlisted(wishlistStore.has(book.id))
+    const onWl = () => setWishlisted(wishlistStore.has(book.id))
+    window.addEventListener(WISHLIST_CHANGED, onWl)
+    return () => window.removeEventListener(WISHLIST_CHANGED, onWl)
+  }, [book?.id])
+
+  React.useEffect(() => {
+    if (!book?.id) return
+    if (!isAuthenticated || !apiUrlConfigured() || !laravelAuthEnabled()) return
+    let cancelled = false
+    syncWishlistWithServer()
+      .then(() => {
+        if (!cancelled) setWishlisted(wishlistStore.has(book.id))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [book?.id, isAuthenticated])
+
+  React.useEffect(() => {
+    if (!book?.id) return
+    let alive = true
+    refreshBookInCart(book.id).then(v => {
+      if (alive) setInCart(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [book?.id, isAuthenticated])
+
+  React.useEffect(() => {
+    if (!book?.id) return
+    setReviewsVisible(INITIAL_REVIEW_VISIBLE)
+  }, [book?.id])
 
   if (!book) {
     return (
@@ -189,98 +296,6 @@ function BookDetailContent() {
     price: book.price ?? null,
     currency: book.currency ?? null,
   }
-
-  const [wishlisted, setWishlisted] = React.useState(false)
-  const [wishBusy, setWishBusy] = React.useState(false)
-  const [inCart, setInCart] = React.useState(false)
-  const [addedToast, setAddedToast] = React.useState(false)
-  const [cartBusy, setCartBusy] = React.useState(false)
-  const [shareHint, setShareHint] = React.useState(false)
-  const [related, setRelated] = React.useState<BookCardData[]>([])
-  const [reviewsVisible, setReviewsVisible] = React.useState(INITIAL_REVIEW_VISIBLE)
-  type ReviewItem = { id: string; user: string; avatar: string; rating: number; date: string; comment: string }
-  const [liveReviews, setLiveReviews] = React.useState<ReviewItem[]>([])
-  const [reviewsFetched, setReviewsFetched] = React.useState(false)
-
-  React.useEffect(() => {
-    if (!bookId || !liveBooks) return
-    let cancelled = false
-    reviewsApi
-      .list(bookId)
-      .then(res => {
-        if (cancelled) return
-        const rows = Array.isArray(res?.data) ? res.data : []
-        const mapped: ReviewItem[] = rows.map((r: unknown) => {
-          const row = r as Record<string, unknown>
-          return {
-            id: String(row.id ?? row.review_id ?? Math.random()),
-            user: String(row.user_name ?? row.author_name ?? row.userName ?? "Reader"),
-            avatar: String(row.user_name ?? row.author_name ?? "R").slice(0, 2).toUpperCase(),
-            rating: Number(row.rating ?? 5),
-            date: row.created_at ? new Date(String(row.created_at)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
-            comment: String(row.comment ?? row.body ?? ""),
-          }
-        })
-        setLiveReviews(mapped)
-        setReviewsFetched(true)
-      })
-      .catch(() => setReviewsFetched(true))
-    return () => { cancelled = true }
-  }, [bookId, liveBooks])
-
-  React.useEffect(() => {
-    const fb = MOCK_BOOKS.filter(b => b.category === book.category && b.id !== book.id).slice(0, 6)
-    setRelated(fb)
-    if (!liveBooks) return
-    let cancelled = false
-    booksApi
-      .list({ category: book.category, per_page: "12" })
-      .then(res => {
-        if (cancelled) return
-        const raw = res?.data
-        const list = Array.isArray(raw) ? raw : []
-        const rows = list.map(row => apiBookToCard(row as ApiBookRecord)).filter(b => b.id !== book.id).slice(0, 6)
-        if (rows.length) setRelated(rows)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [book.id, book.category, liveBooks])
-
-  React.useEffect(() => {
-    setWishlisted(wishlistStore.has(book.id))
-    const onWl = () => setWishlisted(wishlistStore.has(book.id))
-    window.addEventListener(WISHLIST_CHANGED, onWl)
-    return () => window.removeEventListener(WISHLIST_CHANGED, onWl)
-  }, [book.id])
-
-  React.useEffect(() => {
-    if (!isAuthenticated || !apiUrlConfigured() || !laravelAuthEnabled()) return
-    let cancelled = false
-    syncWishlistWithServer()
-      .then(() => {
-        if (!cancelled) setWishlisted(wishlistStore.has(book.id))
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [book.id, isAuthenticated])
-
-  React.useEffect(() => {
-    let alive = true
-    refreshBookInCart(book.id).then(v => {
-      if (alive) setInCart(v)
-    })
-    return () => {
-      alive = false
-    }
-  }, [book.id, isAuthenticated])
-
-  React.useEffect(() => {
-    setReviewsVisible(INITIAL_REVIEW_VISIBLE)
-  }, [book.id])
 
   const ratingBreakdown = [
     { stars: 5, pct: 68 }, { stars: 4, pct: 20 }, { stars: 3, pct: 8 },
