@@ -373,7 +373,8 @@ export const booksApi = {
     })
     return request<{ data: unknown[]; meta: unknown }>(`/books/search?${qs}`)
   },
-  categories: () => request<{ data: string[] }>("/books/categories"),
+  categories: () =>
+    request<{ data: (string | { name: string; slug?: string; id?: string | number; count?: number; book_count?: number })[] }>("/books/categories"),
   get:    (id: string) => request<{ data: unknown }>(`/books/${id}`),
   /** JSON metadata + URLs/keys (no multipart). */
   createJson: (body: Record<string, unknown>) =>

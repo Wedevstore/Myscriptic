@@ -200,7 +200,7 @@ All paths under `/api`. Auth = Laravel Sanctum Bearer token unless noted.
 |--------|------|------|---------|----------|
 | GET | `/books` | No | query params | `{ data: Book[], meta }` |
 | GET | `/books/search` | No | `?q=&per_page=&page=` | `{ data, meta }` |
-| GET | `/books/categories` | No | — | `{ data: string[] }` |
+| GET | `/books/categories` | No | — | `{ data: [{ name, slug?, count? }] }` or `{ data: string[] }` |
 | GET | `/books/:id` | No | — | `{ data: Book }` |
 | POST | `/books` | Yes | JSON (see payload below) | `{ data: Book }` |
 | PATCH | `/books/:id` | Yes | JSON partial | `{ data: Book }` |
@@ -208,6 +208,8 @@ All paths under `/api`. Auth = Laravel Sanctum Bearer token unless noted.
 | GET | `/author/my-books` | Yes | query params | `{ data, meta }` |
 | POST | `/admin/books/:id/approve` | Admin | — | void |
 | POST | `/admin/books/:id/reject` | Admin | `{ reason }` | void |
+
+**Categories endpoint:** Preferred response is `{ data: [{ name: "Fiction", slug: "fiction", count: 42 }] }` where `count` is the number of published books in that category. The frontend also handles a plain `{ data: ["Fiction", "Self-Help", ...] }` response (counts hidden). If `count` / `book_count` is included, it's shown below the category name on the homepage.
 
 **Book create/patch JSON payload:**
 ```json
@@ -503,3 +505,4 @@ Author uploads use the same upload flow for EPUB and PDF (`book_file_s3_key`); p
 | 2026-04-12 | CSP tightened | `next.config.js` | No backend change — removed `unsafe-eval` from Content-Security-Policy |
 | 2026-04-12 | Error reporting facade | `lib/error-reporting.ts`, `app/error.tsx`, `app/global-error.tsx` | No backend change — structured error logging for Vercel log drain |
 | 2026-04-12 | Footer newsletter wired to API | `components/layout/footer-newsletter.tsx` | Ensure `POST /newsletter/subscribe` stores email + sends confirmation |
+| 2026-04-12 | Categories wired to API | `components/home/category-strip.tsx`, `lib/api.ts` | `GET /books/categories` should return `{ data: [{ name, slug?, count? }] }` — frontend handles both object array and plain string array |

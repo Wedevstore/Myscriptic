@@ -146,7 +146,9 @@ function BooksContent() {
       } else {
         setApiBooks(null)
       }
-      if (catRes?.data?.length) setApiCats(catRes.data)
+      if (catRes?.data?.length) {
+        setApiCats(catRes.data.map(c => typeof c === "string" ? c : c.name))
+      }
       setLoading(false)
     })
     return () => {
