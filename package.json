@@ -31,12 +31,12 @@
     "clsx": "^2.1.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.400.0",
-    "next": "^16.2.1",
+    "next": "^16.2.3",
     "otplib": "^13.4.0",
     "pdfjs-dist": "^5.6.205",
     "qrcode": "^1.5.4",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "recharts": "^3.8.1",
     "tailwind-merge": "^2.3.0",
     "tailwindcss": "^3.4.17",
@@ -49,7 +49,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^8.0.0",
-    "eslint-config-next": "^15.0.0",
+    "eslint-config-next": "^16.2.3",
     "typescript": "^5.0.0"
   }
 }
