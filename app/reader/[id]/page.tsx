@@ -556,6 +556,7 @@ function ReaderContent() {
       }
 
       // 2. Direct S3 (author EPUB/PDF is stored in S3; reader downloads via signed GET)
+      let s3Error: string | null = null
       try {
         setContentProgress("Fetching book file…")
         const { url } = await libraryApi.getSignedUrl(routeId)
@@ -567,11 +568,14 @@ function ReaderContent() {
           await booksApi.saveChapters(routeId, parsed.chapters.map((ch, i) => ({ index: i, title: ch.title, content: ch.content })))
         } catch { /* best-effort server cache */ }
         return
-      } catch { /* signed URL / S3 fetch failed — try API chapters */ }
+      } catch (e) {
+        s3Error = e instanceof Error ? e.message : "S3 fetch failed"
+      }
 
       if (!alive) return
 
       // 3. Fallback: server-stored chapters
+      let chaptersError: string | null = null
       try {
         setContentProgress("Loading chapters…")
         const chaptersRes = await booksApi.getChapters(routeId)
@@ -580,14 +584,21 @@ function ReaderContent() {
           await applyFromChapters(chaptersRes.data)
           return
         }
-      } catch { /* no chapters */ }
+        chaptersError = "No chapters available yet"
+      } catch (e) {
+        chaptersError = e instanceof Error ? e.message : "Chapters API failed"
+      }
 
       if (!alive) return
       setContentLoading(false)
       setContentProgress(null)
-      setContentError("Could not load book content.")
-      setReaderPages(MOCK_PAGES)
-      setHasParsedContent(false)
+
+      const reason = chaptersError?.toLowerCase().includes("not found") || chaptersError?.toLowerCase().includes("404")
+        ? "This book's content hasn't been uploaded yet."
+        : s3Error?.toLowerCase().includes("not found") || s3Error?.toLowerCase().includes("404") || s3Error?.toLowerCase().includes("no access")
+          ? "Book file not available. It may still be processing."
+          : "Could not reach the server. Check your connection and try again."
+      setContentError(reason)
     }
 
     loadChapters()
@@ -1314,9 +1325,11 @@ function ReaderContent() {
         <div className={cn(
           "fixed left-0 right-0 z-[70] px-4 py-2.5 text-center text-sm font-medium flex items-center justify-center gap-3 flex-wrap",
           isPreview ? "top-7" : "top-0",
-          theme === "dark" ? "bg-red-900/80 text-red-200" : "bg-red-50 text-red-700 border-b border-red-200"
+          contentError.includes("hasn't been uploaded") || contentError.includes("not available") || contentError.includes("processing")
+            ? (theme === "dark" ? "bg-amber-900/60 text-amber-200 border-b border-amber-700" : "bg-amber-50 text-amber-800 border-b border-amber-200")
+            : (theme === "dark" ? "bg-red-900/80 text-red-200" : "bg-red-50 text-red-700 border-b border-red-200")
         )}>
-          <span>Could not load book file: {contentError}</span>
+          <span>{contentError}</span>
           <button
             type="button"
             onClick={() => {
@@ -1341,7 +1354,7 @@ function ReaderContent() {
                       parsed.chapters.map((ch, i) => ({ index: i, title: ch.title, content: ch.content }))
                     )
                   } catch { /* best-effort */ }
-                } catch {
+                } catch (s3Err) {
                   try {
                     const chaptersRes = await booksApi.getChapters(routeId)
                     if (chaptersRes.data && chaptersRes.data.length > 0) {
@@ -1364,13 +1377,19 @@ function ReaderContent() {
                   } catch { /* noop */ }
                   setContentLoading(false)
                   setContentProgress(null)
-                  setContentError("Retry failed.")
+                  const msg = s3Err instanceof Error ? s3Err.message : ""
+                  const reason = msg.includes("404") || msg.includes("not found")
+                    ? "Book file not available yet."
+                    : "Could not reach the server. Try again later."
+                  setContentError(reason)
                 }
               })()
             }}
             className={cn(
               "px-3 py-1 rounded-lg text-xs font-semibold transition-colors",
-              theme === "dark" ? "bg-red-800 hover:bg-red-700 text-red-100" : "bg-red-100 hover:bg-red-200 text-red-800"
+              contentError.includes("hasn't been uploaded") || contentError.includes("not available") || contentError.includes("processing")
+                ? (theme === "dark" ? "bg-amber-800 hover:bg-amber-700 text-amber-100" : "bg-amber-100 hover:bg-amber-200 text-amber-800")
+                : (theme === "dark" ? "bg-red-800 hover:bg-red-700 text-red-100" : "bg-red-100 hover:bg-red-200 text-red-800")
             )}
           >
             Retry
@@ -1378,7 +1397,7 @@ function ReaderContent() {
           <button
             type="button"
             onClick={() => setContentError(null)}
-            className="text-xs opacity-70 hover:opacity-100 underline"
+            className="text-xs opacity-70 hover:opacity-100 underline transition-opacity"
           >
             Dismiss
           </button>

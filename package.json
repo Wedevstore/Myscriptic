@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check:s3-cors": "node scripts/check-s3-cors.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

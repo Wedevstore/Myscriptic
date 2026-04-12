@@ -443,6 +443,8 @@ Frontend accepts both `snake_case` and `camelCase` for all fields.
 
 ### Bucket CORS (required for browser uploads/downloads)
 
+**Verify after deploy:** copy a presigned GET URL from the browser Network tab (reader load), then from the repo root run `npm run check:s3-cors -- '<url>'`. The script sends `Origin` for localhost and production hosts and checks `access-control-allow-origin`. See `scripts/check-s3-cors.mjs`.
+
 ```json
 [
   {
@@ -477,6 +479,7 @@ Author uploads use the same upload flow for EPUB and PDF (`book_file_s3_key`); p
 
 | Date | Change | Frontend Files | Backend Impact |
 |------|--------|----------------|----------------|
+| 2026-04-12 | S3 CORS check script | `scripts/check-s3-cors.mjs`, `package.json` | No API change; bucket CORS must allow app origins (see §4) |
 | 2026-04-12 | Ebook reader: S3-first, EPUB MIME on upload | `lib/api.ts`, `app/reader/[id]/page.tsx` | Ensure `POST /library/:id/signed-url` serves `book_file_s3_key`; presign upload accepts `application/epub+zip` |
 | 2026-04-12 | Book chapters: parse, store, fetch | `lib/book-parser.ts`, `lib/api.ts`, `app/reader/[id]/page.tsx` | NEW: `book_chapters` table, `POST/GET /books/:id/chapters` |
 | 2026-04-12 | S3 direct upload + signed download | `lib/api.ts`, `app/dashboard/author/books/new/page.tsx` | NEW: `POST /upload/signed-url`, `POST /library/:id/signed-url` |
