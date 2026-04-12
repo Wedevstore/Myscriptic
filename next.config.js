@@ -53,8 +53,10 @@ const nextConfig = {
       { protocol: "https", hostname: "placehold.co", pathname: "/**" },
       { protocol: "https", hostname: "picsum.photos", pathname: "/**" },
       { protocol: "https", hostname: "fastly.picsum.photos", pathname: "/**" },
-      { protocol: "https", hostname: "*.amazonaws.com", pathname: "/**" },
-      { protocol: "https", hostname: "*.cloudfront.net", pathname: "/**" },
+      // `*` matches one subdomain segment; S3 virtual-hosted URLs are
+      // `bucket.s3.region.amazonaws.com` — use `**` for nested subdomains.
+      { protocol: "https", hostname: "**.amazonaws.com", pathname: "/**" },
+      { protocol: "https", hostname: "**.cloudfront.net", pathname: "/**" },
     ],
   },
 }

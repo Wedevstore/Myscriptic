@@ -1,7 +1,10 @@
 "use client"
 
 import Image from "next/image"
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+
+const COVER_PLACEHOLDER = "/images/book-placeholder.svg"
 
 type CoverImageProps = {
   src: string
@@ -30,15 +33,22 @@ function canOptimize(url: string): boolean {
 }
 
 export function CoverImage({ src, alt, className, priority, sizes }: CoverImageProps) {
+  const [resolvedSrc, setResolvedSrc] = useState(src)
+
+  useEffect(() => {
+    setResolvedSrc(src)
+  }, [src])
+
   return (
     <Image
-      src={src}
+      src={resolvedSrc}
       alt={alt}
       fill
       sizes={sizes ?? "(max-width: 768px) 50vw, 320px"}
       className={cn("object-cover", className)}
-      unoptimized={!canOptimize(src)}
+      unoptimized={!canOptimize(resolvedSrc)}
       priority={priority}
+      onError={() => setResolvedSrc(COVER_PLACEHOLDER)}
     />
   )
 }
