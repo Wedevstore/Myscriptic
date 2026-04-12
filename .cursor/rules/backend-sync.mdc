@@ -1,0 +1,31 @@
+---
+description: Auto-update BACKEND.md when API-related frontend files change
+globs: lib/api.ts,lib/server-api.ts,lib/book-mapper.ts,lib/staff-permissions.ts,components/providers/auth-provider.tsx,app/dashboard/admin/**/*.tsx,app/dashboard/author/**/*.tsx,app/become-author/**/*.tsx
+alwaysApply: false
+---
+
+# Backend Sync Rule
+
+When you edit any file that touches the Laravel API contract (endpoints, request/response shapes, new tables, new columns, auth fields), you MUST also update `BACKEND.md` at the project root.
+
+## What to update
+
+1. **New endpoint?** → Add a row to the matching table in Section 2.
+2. **Changed request/response shape?** → Update the relevant payload block or response description.
+3. **New DB table or column?** → Add or update the SQL in Section 1 and add a row to the Changelog in Section 5.
+4. **Changed user object fields?** → Update Section 3.
+5. **Changed S3 flow?** → Update Section 4.
+6. **Always** append a new row to the Changelog (Section 5) with today's date, what changed, which frontend files were touched, and what backend work is needed.
+
+## How to update
+
+- Use the `StrReplace` or `Write` tool on `BACKEND.md`.
+- Keep the existing markdown table format.
+- Update the `Last synced:` date in the header.
+- If a GitHub issue exists for this change, link it. If not, note that a new issue should be created.
+
+## Do NOT
+
+- Skip the update even for "small" changes — one missing endpoint row costs hours of backend debugging.
+- Remove existing entries (only amend or add).
+- Change the file structure/sections without good reason.
