@@ -426,18 +426,48 @@ export const booksApi = {
     return { key }
   },
 
-  /** Store parsed chapters for a book (POST /api/books/:id/chapters). */
-  saveChapters: (bookId: string, chapters: { index: number; title: string; content: string }[]) =>
-    request<{ success: boolean }>(`/books/${bookId}/chapters`, {
-      method: "POST",
-      body: JSON.stringify({ chapters }),
-    }),
+  /**
+   * Store parsed chapters for a book (POST /api/books/:id/chapters).
+   * Batches large chapter sets into groups to avoid timeout on big books.
+   */
+  saveChapters: async (bookId: string, chapters: { index: number; title: string; content: string }[]) => {
+    const BATCH_SIZE = 15
+    if (chapters.length <= BATCH_SIZE) {
+      return request<{ success: boolean }>(`/books/${bookId}/chapters`, {
+        method: "POST",
+        body: JSON.stringify({ chapters }),
+      })
+    }
+    for (let i = 0; i < chapters.length; i += BATCH_SIZE) {
+      const batch = chapters.slice(i, i + BATCH_SIZE)
+      await request<{ success: boolean }>(`/books/${bookId}/chapters`, {
+        method: "POST",
+        body: JSON.stringify({ chapters: batch, append: i > 0 }),
+      })
+    }
+    return { success: true } as { success: boolean }
+  },
 
-  /** Get cached chapters from the server (GET /api/books/:id/chapters). */
-  getChapters: (bookId: string) =>
-    request<{
-      data: { index: number; title: string; content: string }[] | null
-    }>(`/books/${bookId}/chapters`),
+  /**
+   * Get cached chapters from the server (GET /api/books/:id/chapters).
+   * Fetches all pages if the server paginates.
+   */
+  getChapters: async (bookId: string) => {
+    let allChapters: { index: number; title: string; content: string }[] = []
+    let page = 1
+    const MAX_PAGES = 20
+    while (page <= MAX_PAGES) {
+      const res = await request<{
+        data: { index: number; title: string; content: string }[] | null
+        meta?: { current_page?: number; last_page?: number }
+      }>(`/books/${bookId}/chapters?page=${page}`)
+      if (res.data) allChapters = allChapters.concat(res.data)
+      const lastPage = res.meta?.last_page ?? 1
+      if (page >= lastPage || !res.data || res.data.length === 0) break
+      page++
+    }
+    return { data: allChapters.length > 0 ? allChapters : null }
+  },
 }
 
 // ── Authors (public trending + authenticated follows) ─────────────────────────

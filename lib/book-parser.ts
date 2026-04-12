@@ -576,11 +576,11 @@ export async function parseBookFile(
  * Used by the reader to load book content on-the-fly.
  *
  * Flow:
- *   1. Check localStorage cache → return immediately if cached
+ *   1. Check IndexedDB/localStorage cache → return immediately if cached
  *   2. Fetch the file from S3
  *   3. Detect format (EPUB vs PDF) from bytes and URL extension
  *   4. Parse into chapters
- *   5. Cache in localStorage for next time
+ *   5. Cache in IndexedDB (fallback localStorage) for next time
  *   6. Return parsed book
  */
 export async function fetchAndParseBook(
@@ -588,7 +588,14 @@ export async function fetchAndParseBook(
   signedUrl: string,
   onProgress?: (msg: string) => void
 ): Promise<ParsedBook> {
-  const cached = loadParsedBook(bookId)
+  // Try IndexedDB first, then localStorage
+  let cached: ParsedBook | null = null
+  try {
+    const { idbLoadParsedBook } = await import("./chapter-store")
+    cached = await idbLoadParsedBook(bookId)
+  } catch {
+    cached = loadParsedBook(bookId)
+  }
   if (cached) return cached
 
   onProgress?.("Downloading book from server…")
@@ -630,17 +637,26 @@ export async function fetchAndParseBook(
   const urlPath = new URL(signedUrl, "https://x").pathname
   const format = detectFormat(buffer, urlPath)
 
+  async function saveToIdb(parsed: ParsedBook) {
+    try {
+      const { idbSaveParsedBook } = await import("./chapter-store")
+      await idbSaveParsedBook(bookId, parsed)
+    } catch {
+      saveParsedBook(bookId, parsed)
+    }
+  }
+
   if (format === "epub") {
     onProgress?.("Extracting EPUB chapters…")
     const parsed = await parseEpubBuffer(buffer)
-    saveParsedBook(bookId, parsed)
+    await saveToIdb(parsed)
     return parsed
   }
 
   if (format === "pdf") {
     onProgress?.("Parsing PDF pages…")
     const parsed = await parsePdfViaWorker(buffer, onProgress)
-    saveParsedBook(bookId, parsed)
+    await saveToIdb(parsed)
     return parsed
   }
 

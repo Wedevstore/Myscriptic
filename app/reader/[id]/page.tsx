@@ -517,80 +517,72 @@ function ReaderContent() {
   }, [])
 
   React.useEffect(() => {
-    const localCached = loadParsedBook(engagementBookId)
-    if (localCached && localCached.chapters.length > 0) {
-      applyParsed(localCached)
-      return
-    }
-
-    const isLive =
-      laravelPhase3Enabled() && /^\d+$/.test(routeId) && book.format !== "audiobook"
-    if (!isLive) {
-      setReaderPages(MOCK_PAGES)
-      setHasParsedContent(false)
-      return
-    }
-
     let alive = true
-    setContentLoading(true)
-    setContentProgress("Loading chapters…")
 
-    ;(async () => {
+    async function loadChapters() {
+      // 1. Check IndexedDB first, then localStorage
+      try {
+        const { idbLoadParsedBook } = await import("@/lib/chapter-store")
+        const idbCached = await idbLoadParsedBook(engagementBookId)
+        if (idbCached && idbCached.chapters.length > 0 && alive) { applyParsed(idbCached); return }
+      } catch { /* fallback */ }
+      const localCached = loadParsedBook(engagementBookId)
+      if (localCached && localCached.chapters.length > 0 && alive) { applyParsed(localCached); return }
+
+      const isLive = laravelPhase3Enabled() && /^\d+$/.test(routeId) && book.format !== "audiobook"
+      if (!isLive) {
+        if (alive) { setReaderPages(MOCK_PAGES); setHasParsedContent(false) }
+        return
+      }
+
+      if (alive) { setContentLoading(true); setContentProgress("Loading chapters…") }
+
+      // 2. Try API chapters
       try {
         const chaptersRes = await booksApi.getChapters(routeId)
         if (!alive) return
         if (chaptersRes.data && chaptersRes.data.length > 0) {
           const looksLikeHtml = /<[a-z][\s\S]*>/i.test(chaptersRes.data[0]?.content ?? "")
           const rebuilt: ParsedBook = {
-            format: "epub",
-            title: null,
-            author: null,
+            format: "epub", title: null, author: null,
             chapters: chaptersRes.data,
             totalCharacters: chaptersRes.data.reduce((s, c) => s + c.content.length, 0),
             parsedAt: new Date().toISOString(),
             contentType: looksLikeHtml ? "html" : "text",
           }
-          saveParsedBook(engagementBookId, rebuilt)
+          try {
+            const { idbSaveParsedBook } = await import("@/lib/chapter-store")
+            await idbSaveParsedBook(engagementBookId, rebuilt)
+          } catch { saveParsedBook(engagementBookId, rebuilt) }
           if (alive) applyParsed(rebuilt)
           return
         }
-      } catch {
-        /* API chapters not available — try S3 */
-      }
+      } catch { /* API chapters not available — try S3 */ }
 
       if (!alive) return
+
+      // 3. Fetch from S3
       try {
         setContentProgress("Fetching book file…")
         const { url } = await libraryApi.getSignedUrl(routeId)
         if (!alive) return
-        const parsed = await fetchAndParseBook(
-          engagementBookId,
-          url,
-          alive ? setContentProgress : undefined
-        )
+        const parsed = await fetchAndParseBook(engagementBookId, url, alive ? setContentProgress : undefined)
         if (!alive) return
         applyParsed(parsed)
-
         try {
-          await booksApi.saveChapters(
-            routeId,
-            parsed.chapters.map((ch, i) => ({ index: i, title: ch.title, content: ch.content }))
-          )
-        } catch {
-          /* best-effort server cache */
-        }
+          await booksApi.saveChapters(routeId, parsed.chapters.map((ch, i) => ({ index: i, title: ch.title, content: ch.content })))
+        } catch { /* best-effort server cache */ }
       } catch (err) {
         if (!alive) return
         setContentLoading(false)
         setContentProgress(null)
-        setContentError(
-          err instanceof Error ? err.message : "Could not load book content."
-        )
+        setContentError(err instanceof Error ? err.message : "Could not load book content.")
         setReaderPages(MOCK_PAGES)
         setHasParsedContent(false)
       }
-    })()
+    }
 
+    loadChapters()
     return () => { alive = false }
   }, [engagementBookId, routeId, applyParsed, book.format])
 
@@ -705,6 +697,30 @@ function ReaderContent() {
   const [autoScrollOn, setAutoScrollOn] = React.useState(false)
   const [autoScrollSpeed, setAutoScrollSpeed] = React.useState(AUTO_SCROLL_SPEED_DEFAULT)
   const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false)
+
+  // Virtualization: only mount chapters near the viewport (vertical mode)
+  const VIRTUAL_BUFFER = 2
+  const [mountedRange, setMountedRange] = React.useState<[number, number]>([0, Math.min(4, 999)])
+  React.useEffect(() => {
+    if (readingLayout !== "vertical" || readerPages.length <= 8) return
+    const sentinels = readerPages.map((_, i) => document.getElementById(`reader-sentinel-${i + 1}`)).filter(Boolean) as HTMLElement[]
+    if (sentinels.length === 0) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visibleIndices = entries.filter(e => e.isIntersecting).map(e => {
+          const id = e.target.id
+          return Number(id.replace("reader-sentinel-", "")) - 1
+        }).filter(n => Number.isFinite(n))
+        if (visibleIndices.length === 0) return
+        const minVis = Math.min(...visibleIndices)
+        const maxVis = Math.max(...visibleIndices)
+        setMountedRange([Math.max(0, minVis - VIRTUAL_BUFFER), Math.min(readerPages.length - 1, maxVis + VIRTUAL_BUFFER)])
+      },
+      { rootMargin: "200% 0px 200% 0px" }
+    )
+    sentinels.forEach(s => io.observe(s))
+    return () => io.disconnect()
+  }, [readingLayout, readerPages])
   const autoScrollSpeedRef = React.useRef(AUTO_SCROLL_SPEED_DEFAULT)
   autoScrollSpeedRef.current = autoScrollSpeed
 
@@ -2452,19 +2468,27 @@ function ReaderContent() {
         >
           {readingLayout === "vertical" ? (
             <article dir="auto" className={cn(fontFamily === "serif" ? "font-serif" : "font-sans", "reader-typography")}>
-              {readerPages.map(p => (
-                <section
-                  key={p.page}
-                  id={`reader-section-${p.page}`}
-                  className="mb-14 scroll-mt-28 last:mb-8 sm:scroll-mt-32"
-                >
-                  {p.contentType === "html" ? (
-                    <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none prose-headings:font-serif prose-img:rounded-lg" dangerouslySetInnerHTML={{ __html: p.content }} />
-                  ) : (
-                    <div className="whitespace-pre-wrap">{p.content}</div>
-                  )}
-                </section>
-              ))}
+              {readerPages.map((p, idx) => {
+                const isMounted = readerPages.length <= 8 || (idx >= mountedRange[0] && idx <= mountedRange[1])
+                return (
+                  <section
+                    key={p.page}
+                    id={`reader-section-${p.page}`}
+                    className="mb-14 scroll-mt-28 last:mb-8 sm:scroll-mt-32"
+                  >
+                    <div id={`reader-sentinel-${p.page}`} />
+                    {isMounted ? (
+                      p.contentType === "html" ? (
+                        <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none prose-headings:font-serif prose-img:rounded-lg" dangerouslySetInnerHTML={{ __html: p.content }} />
+                      ) : (
+                        <div className="whitespace-pre-wrap">{p.content}</div>
+                      )
+                    ) : (
+                      <div className="h-[60vh]" aria-hidden="true" />
+                    )}
+                  </section>
+                )
+              })}
             </article>
           ) : (
             <div
