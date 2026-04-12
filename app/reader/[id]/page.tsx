@@ -501,6 +501,11 @@ function ReaderContent() {
   /** Stable id for engagement + progress APIs (numeric Laravel id vs mock `bk_*`). */
   const engagementBookId = /^\d+$/.test(routeId) ? routeId : book.id
 
+  // ── Access check state (declared early so content-loading effect can depend on it) ─
+  const [accessState, setAccessState] = React.useState<
+    "checking" | "allowed" | "denied_subscription" | "denied_paid"
+  >("checking")
+
   // ── Load parsed chapters: localStorage → API chapters → S3 fetch+parse ───
   const [readerPages, setReaderPages] = React.useState<{ page: number; content: string; contentType?: "html" | "text" }[]>(() => MOCK_PAGES)
   const [hasParsedContent, setHasParsedContent] = React.useState(false)
@@ -609,10 +614,6 @@ function ReaderContent() {
   }, [engagementBookId, routeId, applyParsed, book.format])
 
   // ── Access check ────────────────────────────────────────────────────────────
-  const [accessState, setAccessState] = React.useState<
-    "checking" | "allowed" | "denied_subscription" | "denied_paid"
-  >("checking")
-
   React.useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
