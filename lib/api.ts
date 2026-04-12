@@ -80,13 +80,22 @@ async function request<T>(
     ...(options.headers as Record<string, string> ?? {}),
   }
 
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20_000)
+
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+    res = await fetch(`${BASE_URL}${path}`, { ...options, headers, signal: controller.signal })
   } catch (networkErr) {
+    clearTimeout(timeout)
+    if (networkErr instanceof DOMException && networkErr.name === "AbortError") {
+      throw new Error("Server is not responding. Please try again later.")
+    }
     throw new Error(
       networkErr instanceof Error ? networkErr.message : "Network request failed. Please check your connection."
     )
+  } finally {
+    clearTimeout(timeout)
   }
 
   if (res.status === 401 || res.status === 419) {
@@ -128,14 +137,30 @@ export async function loginWithPassword(
   email: string,
   password: string
 ): Promise<LoginPasswordOutcome> {
-  const res = await fetch(`${BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000)
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    clearTimeout(timeout)
+    if (err instanceof DOMException && err.name === "AbortError") {
+      return { kind: "error", message: "Server is not responding. Please try again later." }
+    }
+    return { kind: "error", message: "Network error. Check your connection and try again." }
+  } finally {
+    clearTimeout(timeout)
+  }
+
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok) {
     return { kind: "error", message: messageFromErrorPayload(data, res.statusText) }
