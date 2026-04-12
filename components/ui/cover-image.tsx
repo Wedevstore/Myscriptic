@@ -24,6 +24,7 @@ const OPTIMIZABLE_HOSTS = [
 ]
 
 function canOptimize(url: string): boolean {
+  if (!url.trim()) return false
   try {
     const hostname = new URL(url).hostname
     return OPTIMIZABLE_HOSTS.some(h => hostname === h || hostname.endsWith(`.${h}`))
@@ -32,15 +33,21 @@ function canOptimize(url: string): boolean {
   }
 }
 
+function normalizeSrc(raw: string): string {
+  const t = raw?.trim()
+  return t || COVER_PLACEHOLDER
+}
+
 export function CoverImage({ src, alt, className, priority, sizes }: CoverImageProps) {
-  const [resolvedSrc, setResolvedSrc] = useState(src)
+  const [resolvedSrc, setResolvedSrc] = useState(() => normalizeSrc(src))
 
   useEffect(() => {
-    setResolvedSrc(src)
+    setResolvedSrc(normalizeSrc(src))
   }, [src])
 
   return (
     <Image
+      key={resolvedSrc}
       src={resolvedSrc}
       alt={alt}
       fill
@@ -48,7 +55,9 @@ export function CoverImage({ src, alt, className, priority, sizes }: CoverImageP
       className={cn("object-cover", className)}
       unoptimized={!canOptimize(resolvedSrc)}
       priority={priority}
-      onError={() => setResolvedSrc(COVER_PLACEHOLDER)}
+      onError={() => {
+        setResolvedSrc(cur => (cur === COVER_PLACEHOLDER ? cur : COVER_PLACEHOLDER))
+      }}
     />
   )
 }

@@ -48,11 +48,13 @@ const ACCESS_BADGE: Record<AccessType, { label: string; className: string }> = {
 }
 
 function StarRating({ value, count }: { value: number; count: number }) {
+  const safeValue = typeof value === "number" && Number.isFinite(value) ? value : 0
+  const safeCount = typeof count === "number" && Number.isFinite(count) ? count : 0
   return (
     <div className="flex items-center gap-1">
       <Star size={11} className="fill-brand text-brand shrink-0" />
-      <span className="text-xs font-semibold text-foreground tabular-nums">{value.toFixed(1)}</span>
-      <span className="text-xs text-muted-foreground">({count.toLocaleString()})</span>
+      <span className="text-xs font-semibold text-foreground tabular-nums">{safeValue.toFixed(1)}</span>
+      <span className="text-xs text-muted-foreground">({safeCount.toLocaleString()})</span>
     </div>
   )
 }

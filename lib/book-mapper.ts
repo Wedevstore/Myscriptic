@@ -1,7 +1,8 @@
 import type { BookCardData, AccessType, BookFormat } from "@/components/books/book-card"
 import { demoPic } from "@/lib/demo-images"
 
-const FALLBACK_COVER = "/images/book-placeholder.svg"
+/** Local placeholder when API/CMS omits or fails to load a cover. */
+export const FALLBACK_COVER = "/images/book-placeholder.svg"
 
 /** Shape returned by Laravel book list/search payloads (camelCase JSON). */
 export type ApiBookRecord = {

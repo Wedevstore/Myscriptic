@@ -9,15 +9,20 @@ import { SubscriptionBanner } from "@/components/home/subscription-banner"
 import { CourseStrip } from "@/components/home/course-strip"
 import type { BookCardData } from "@/components/books/book-card"
 import type { CmsHomepageBook, CmsHomepageSection } from "@/lib/cms-homepage"
+import { FALLBACK_COVER } from "@/lib/book-mapper"
 
 function toCard(b: CmsHomepageBook): BookCardData {
+  const reviewCount =
+    typeof b.reviewCount === "number" && Number.isFinite(b.reviewCount) ? b.reviewCount : 0
+  const rating = typeof b.rating === "number" && Number.isFinite(b.rating) ? b.rating : 0
+  const cover = b.coverUrl?.trim()
   return {
     id: b.id,
     title: b.title,
     author: b.author,
-    coverUrl: b.coverUrl ?? "",
-    rating: b.rating ?? 0,
-    reviewCount: b.reviewCount,
+    coverUrl: cover || FALLBACK_COVER,
+    rating,
+    reviewCount,
     price: b.price ?? undefined,
     currency: b.currency,
     accessType: b.accessType as BookCardData["accessType"],
