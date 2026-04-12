@@ -266,6 +266,7 @@ function DiscoverContent() {
   const [followAuthorIds, setFollowAuthorIds] = React.useState<Set<string>>(() => new Set())
   const [live, setLive] = React.useState<null | Awaited<ReturnType<typeof fetchDiscoverLive>>>(null)
   const [liveReady, setLiveReady] = React.useState(() => !apiUrlConfigured())
+  const [liveCats, setLiveCats] = React.useState<{ label: string; count: number | null }[] | null>(null)
 
   React.useEffect(() => {
     mergeLegacyDiscoverAuthorFollows()
@@ -294,6 +295,13 @@ function DiscoverContent() {
       .finally(() => {
         if (!cancelled) setLiveReady(true)
       })
+    booksApi.categories().then(res => {
+      if (cancelled || !res.data?.length) return
+      setLiveCats(res.data.map(c => {
+        if (typeof c === "string") return { label: c, count: null }
+        return { label: c.name, count: c.count ?? c.book_count ?? null }
+      }))
+    }).catch(() => {})
     return () => {
       cancelled = true
     }
@@ -342,17 +350,21 @@ function DiscoverContent() {
 
         {/* Quick category filters */}
         <div className="flex flex-wrap gap-2 mb-10">
-          {CATEGORIES.map(cat => (
+          {(liveCats ?? CATEGORIES.map(c => ({ label: c.label, count: c.count as number | null }))).map(cat => (
             <Link
-              key={cat.id}
-              href={`/books?category=${cat.label}`}
+              key={cat.label}
+              href={`/books?category=${encodeURIComponent(cat.label)}`}
               className={cn(
                 "px-4 py-2 rounded-full border text-sm font-medium transition-all hover:border-brand hover:text-brand",
                 "border-border text-muted-foreground"
               )}
             >
               {cat.label}
-              <span className="ml-1.5 text-xs text-muted-foreground/60">{(cat.count / 1000).toFixed(1)}k</span>
+              {cat.count != null && (
+                <span className="ml-1.5 text-xs text-muted-foreground/60">
+                  {cat.count >= 1000 ? `${(cat.count / 1000).toFixed(1)}k` : cat.count}
+                </span>
+              )}
             </Link>
           ))}
         </div>
