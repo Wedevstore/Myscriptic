@@ -4,6 +4,8 @@
 > Frontend developers: update this file whenever you add/change API calls.
 > Backend developers: use this file to know exactly what to build.
 >
+> **Laravel repo mirror:** [`Wedevstore/myscriptic-api`](https://github.com/Wedevstore/myscriptic-api) keeps a copy under [`docs/frontend-sync/`](https://github.com/Wedevstore/myscriptic-api/tree/main/docs/frontend-sync) plus root [`FRONTEND_SYNC.md`](https://github.com/Wedevstore/myscriptic-api/blob/main/FRONTEND_SYNC.md). When you change this file or `scripts/seed-fresh-books.md`, copy the updates there (or automate sync).
+>
 > GitHub Issues labeled [`backend`](https://github.com/Wedevstore/Myscriptic/issues?q=label:backend) mirror sections below.
 
 **Last synced:** 2026-04-12 (production hardening update)
