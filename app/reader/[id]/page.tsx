@@ -285,6 +285,16 @@ function readerTocAside(theme: Theme) {
   return "bg-white"
 }
 
+/** Prose colors follow the reader paper theme, not `dark:` (avoids light text on white when OS/site is dark). */
+function readerProseClass(theme: Theme) {
+  return cn(
+    "prose prose-sm sm:prose-base max-w-none prose-headings:font-serif prose-img:rounded-lg",
+    theme === "dark" && "prose-invert",
+    theme === "light" && "prose-neutral",
+    theme === "sepia" && "prose-stone",
+  )
+}
+
 function buildToc(pages: { page: number; content: string }[]) {
   return pages.map(p => ({
     page: p.page,
@@ -2556,7 +2566,7 @@ function ReaderContent() {
                     <div id={`reader-sentinel-${p.page}`} />
                     {isMounted ? (
                       p.contentType === "html" ? (
-                        <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none prose-headings:font-serif prose-img:rounded-lg" dangerouslySetInnerHTML={{ __html: p.content }} />
+                        <div className={readerProseClass(theme)} dangerouslySetInnerHTML={{ __html: p.content }} />
                       ) : (
                         <div className="whitespace-pre-wrap">{p.content}</div>
                       )
@@ -2589,7 +2599,7 @@ function ReaderContent() {
                   <div className="mx-auto max-w-2xl">
                     <article dir="auto" className={cn(fontFamily === "serif" ? "font-serif" : "font-sans", "reader-typography")}>
                       {p.contentType === "html" ? (
-                        <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none prose-headings:font-serif prose-img:rounded-lg" dangerouslySetInnerHTML={{ __html: p.content }} />
+                        <div className={readerProseClass(theme)} dangerouslySetInnerHTML={{ __html: p.content }} />
                       ) : (
                         <div className="whitespace-pre-wrap">{p.content}</div>
                       )}
