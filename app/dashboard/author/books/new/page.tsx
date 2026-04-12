@@ -348,21 +348,29 @@ function BookUploadForm() {
 
         if (form.coverFile) {
           setUploadProgress("Uploading cover image…")
-          const { key } = await booksApi.uploadToS3(form.coverFile, pct =>
-            setUploadProgress(`Uploading cover… ${pct}%`)
-          )
-          coverS3Key = key
+          try {
+            const { key } = await booksApi.uploadToS3(form.coverFile, pct =>
+              setUploadProgress(`Uploading cover… ${pct}%`)
+            )
+            coverS3Key = key
+          } catch (e) {
+            throw new Error(`Cover upload failed: ${e instanceof Error ? e.message : "unknown error"}`)
+          }
         }
 
         const bookOrAudioFile = form.format === "audiobook" ? form.audioFile : form.bookFile
         if (bookOrAudioFile) {
           const label = form.format === "audiobook" ? "audio file" : "book file"
           setUploadProgress(`Uploading ${label}…`)
-          const { key } = await booksApi.uploadToS3(bookOrAudioFile, pct =>
-            setUploadProgress(`Uploading ${label}… ${pct}%`)
-          )
-          if (form.format === "audiobook") audioFileS3Key = key
-          else bookFileS3Key = key
+          try {
+            const { key } = await booksApi.uploadToS3(bookOrAudioFile, pct =>
+              setUploadProgress(`Uploading ${label}… ${pct}%`)
+            )
+            if (form.format === "audiobook") audioFileS3Key = key
+            else bookFileS3Key = key
+          } catch (e) {
+            throw new Error(`${label.charAt(0).toUpperCase() + label.slice(1)} upload failed: ${e instanceof Error ? e.message : "unknown error"}`)
+          }
         }
 
         setUploadProgress(isEditMode ? "Updating book…" : "Saving book record…")
@@ -387,12 +395,17 @@ function BookUploadForm() {
         if (form.accessType === "PAID") payload.price = parseFloat(form.price)
 
         let bookId: string
-        if (isEditMode && editId) {
-          await booksApi.patch(editId, payload)
-          bookId = editId
-        } else {
-          const res = await booksApi.createJson(payload)
-          bookId = String((res.data as { id?: string | number })?.id ?? "")
+        try {
+          if (isEditMode && editId) {
+            await booksApi.patch(editId, payload)
+            bookId = editId
+          } else {
+            const res = await booksApi.createJson(payload)
+            bookId = String((res.data as { id?: string | number })?.id ?? "")
+            if (!bookId) throw new Error("API returned success but no book ID")
+          }
+        } catch (e) {
+          throw new Error(`Failed to save book record: ${e instanceof Error ? e.message : "unknown error"}`)
         }
 
         if (bookId && parsedBook) {
@@ -403,7 +416,9 @@ function BookUploadForm() {
               bookId,
               parsedBook.chapters.map((ch, i) => ({ index: i, title: ch.title, content: ch.content }))
             )
-          } catch { /* best-effort */ }
+          } catch (chErr) {
+            console.warn("Chapter save failed (book was created):", chErr)
+          }
         }
 
         clearBookDraft()

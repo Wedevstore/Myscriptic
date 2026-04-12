@@ -410,11 +410,15 @@ export const booksApi = {
       body: JSON.stringify({ reason }),
     }),
   /** Get a signed S3 URL for direct browser → S3 upload */
-  getSignedUploadUrl: (filename: string, mimeType: string) =>
-    request<{ url: string; key: string }>("/upload/signed-url", {
+  getSignedUploadUrl: async (filename: string, mimeType: string) => {
+    const raw = await request<Record<string, unknown>>("/upload/signed-url", {
       method: "POST",
       body: JSON.stringify({ filename, mime_type: mimeType }),
-    }),
+    })
+    const inner = (raw?.data && typeof raw.data === "object" ? raw.data : raw) as { url?: string; key?: string }
+    if (!inner?.url || !inner?.key) throw new Error("Backend did not return a valid upload URL. Check POST /api/upload/signed-url.")
+    return { url: inner.url, key: inner.key }
+  },
 
   /**
    * Upload a file directly to S3 using a pre-signed PUT URL.
@@ -432,8 +436,11 @@ export const booksApi = {
           if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
         })
       }
-      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`S3 upload failed (${xhr.status})`)))
-      xhr.onerror = () => reject(new Error("Network error during S3 upload"))
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve()
+        else reject(new Error(`S3 upload failed: HTTP ${xhr.status}. The presigned URL may have expired or S3 CORS is misconfigured.`))
+      }
+      xhr.onerror = () => reject(new Error("Network error during S3 upload. Check S3 bucket CORS configuration."))
       xhr.send(file)
     })
     return { key }
@@ -1126,10 +1133,14 @@ export const libraryApi = {
    * audio object in S3 (e.g. MP3/M4A) keyed by `audio_file_s3_key` — the web player at
    * `/audio/[id]` calls this when the book payload has no direct `audio_url` / CDN field.
    */
-  getSignedUrl: (bookId: string) =>
-    request<{ url: string; expires_at: string }>(`/library/${bookId}/signed-url`, {
+  getSignedUrl: async (bookId: string) => {
+    const raw = await request<Record<string, unknown>>(`/library/${bookId}/signed-url`, {
       method: "POST",
-    }),
+    })
+    const inner = (raw?.data && typeof raw.data === "object" ? raw.data : raw) as { url?: string; expires_at?: string }
+    if (!inner?.url) throw new Error("Backend did not return a signed download URL. The book file may not be uploaded to S3 yet.")
+    return { url: inner.url, expires_at: inner.expires_at ?? "" }
+  },
 }
 
 // ── Author Sales Analytics (Phase 2) ─────────────────────────────────────────

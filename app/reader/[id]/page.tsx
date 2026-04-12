@@ -593,11 +593,14 @@ function ReaderContent() {
       setContentLoading(false)
       setContentProgress(null)
 
-      const reason = chaptersError?.toLowerCase().includes("not found") || chaptersError?.toLowerCase().includes("404")
-        ? "This book's content hasn't been uploaded yet."
-        : s3Error?.toLowerCase().includes("not found") || s3Error?.toLowerCase().includes("404") || s3Error?.toLowerCase().includes("no access")
-          ? "Book file not available. It may still be processing."
-          : "Could not reach the server. Check your connection and try again."
+      const s3Lc = (s3Error ?? "").toLowerCase()
+      const chLc = (chaptersError ?? "").toLowerCase()
+      const noUpload = s3Lc.includes("not be uploaded") || s3Lc.includes("not found") || s3Lc.includes("404") || s3Lc.includes("no access")
+      const noChapters = chLc.includes("not found") || chLc.includes("404") || chaptersError === "No chapters available yet"
+
+      const reason = (noUpload || noChapters)
+        ? "This book's content hasn't been uploaded yet. The author needs to upload the book file."
+        : "Could not reach the server. Check your connection and try again."
       setContentError(reason)
     }
 
@@ -1378,8 +1381,8 @@ function ReaderContent() {
                   setContentLoading(false)
                   setContentProgress(null)
                   const msg = s3Err instanceof Error ? s3Err.message : ""
-                  const reason = msg.includes("404") || msg.includes("not found")
-                    ? "Book file not available yet."
+                  const reason = msg.includes("not be uploaded") || msg.includes("404") || msg.includes("not found") || msg.includes("no access")
+                    ? "This book's content hasn't been uploaded yet. The author needs to upload the book file."
                     : "Could not reach the server. Try again later."
                   setContentError(reason)
                 }
