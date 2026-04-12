@@ -16,9 +16,8 @@ interface ErrorPageProps {
 
 export default function Error({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    // Log to error reporting service in production
+    // TODO: wire Sentry or similar error reporting here
     // e.g. Sentry.captureException(error)
-    console.error("[MyScriptic] Unhandled error:", error.message)
   }, [error])
 
   return (
@@ -42,7 +41,7 @@ export default function Error({ error, reset }: ErrorPageProps) {
         Something went wrong
       </h1>
       <p className="text-muted-foreground text-base max-w-md mb-2 text-pretty leading-relaxed">
-        An unexpected error occurred. Our team has been notified and is working on a fix.
+        An unexpected error occurred. Please try again or contact support if the problem persists.
       </p>
       {error.digest && (
         <p className="text-xs text-muted-foreground/60 mb-8 font-mono">

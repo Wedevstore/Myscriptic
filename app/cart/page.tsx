@@ -295,7 +295,7 @@ function CartContent() {
                   value={couponInput}
                   onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError("") }}
                   onKeyDown={e => e.key === "Enter" && applyCoupon()}
-                  placeholder="Enter code (try: READ20)"
+                  placeholder="Enter coupon code"
                   className={cn("flex-1 h-9 text-sm", couponError && "border-destructive")}
                 />
                 <Button onClick={applyCoupon} variant="outline" size="sm" className="h-9 hover:border-brand hover:text-brand">

@@ -5,23 +5,26 @@
  * All methods include the Sanctum token from localStorage when present.
  *
  * API origin is read from NEXT_PUBLIC_API_URL (scheme + host, no path), e.g.
- * `https://api.myscriptic.com`. The client always calls `${origin}/api/...` to match Laravel's `routes/api.php`.
+ * `https://api.myscriptic.com`. The client always calls `${origin}/api/...`
+ * to match Laravel's `routes/api.php`.
  * Legacy: if the value already ends with `/api`, it is accepted as-is.
- *
- * Replace every TODO_MOCK comment with real fetch once Laravel is live.
  */
 
 import type { ApiCourseCard, ApiCourseDetail } from "@/lib/courses-from-api"
 
-const DEFAULT_API_ORIGIN = "https://api.myscriptic.com"
-
 /** Resolves Laravel JSON API base (…/api) from NEXT_PUBLIC_API_URL. */
 function laravelApiBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_API_URL?.trim()
-  const origin = (raw && raw.length > 0 ? raw : DEFAULT_API_ORIGIN).replace(/\/+$/, "")
-  if (origin.endsWith("/api")) {
-    return origin
+  if (!raw || raw.length === 0) {
+    if (typeof window !== "undefined") {
+      console.warn(
+        "[MyScriptic] NEXT_PUBLIC_API_URL is not set. API calls will fail."
+      )
+    }
+    return "/api"
   }
+  const origin = raw.replace(/\/+$/, "")
+  if (origin.endsWith("/api")) return origin
   return `${origin}/api`
 }
 
@@ -56,6 +59,15 @@ function messageFromErrorPayload(err: unknown, fallback: string): string {
   return topStr || fallback
 }
 
+function clearAuthAndRedirect() {
+  if (typeof window === "undefined") return
+  try { localStorage.removeItem("myscriptic_auth") } catch { /* noop */ }
+  const l = window.location
+  if (!l.pathname.startsWith("/auth/")) {
+    l.href = `/auth/login?next=${encodeURIComponent(l.pathname + l.search)}`
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -68,7 +80,19 @@ async function request<T>(
     ...(options.headers as Record<string, string> ?? {}),
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  } catch (networkErr) {
+    throw new Error(
+      networkErr instanceof Error ? networkErr.message : "Network request failed. Please check your connection."
+    )
+  }
+
+  if (res.status === 401 || res.status === 419) {
+    clearAuthAndRedirect()
+    throw new Error("Session expired. Please sign in again.")
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
@@ -83,7 +107,11 @@ async function request<T>(
   const text = await res.text()
   if (!text) return undefined as T
 
-  return JSON.parse(text) as T
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error("Invalid response from server.")
+  }
 }
 
 /** Password login may return a token immediately or a 2FA `pending_token` (no Bearer yet). */
@@ -204,11 +232,6 @@ async function downloadAuthenticatedPdf(path: string, defaultFilename: string): 
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authApi = {
-  login:    (email: string, password: string) =>
-    request<{ token: string; user: unknown }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }),
   register: (name: string, email: string, password: string, role = "user") =>
     request<{ token: string; user: unknown }>("/auth/register", {
       method: "POST",
@@ -476,7 +499,7 @@ export const authorFollowsApi = {
 export const subscriptionsApi = {
   plans: () => request<{ data: unknown[] }>("/subscription/plans"),
 
-  /** Creates a pending subscription order and returns a payment URL (mock or gateway). */
+  /** Creates a pending subscription order and returns a payment gateway URL. */
   checkout: (body: {
     plan_id:         string
     payment_gateway: string

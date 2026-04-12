@@ -275,6 +275,9 @@ function SearchPalette({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-[60] bg-foreground/40 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search"
       onClick={onClose}
     >
       <div
@@ -295,7 +298,7 @@ function SearchPalette({ onClose }: { onClose: () => void }) {
               aria-label="Search"
             />
             {query && (
-              <button onClick={() => setQuery("")} className="text-muted-foreground hover:text-foreground shrink-0">
+              <button onClick={() => setQuery("")} className="text-muted-foreground hover:text-foreground shrink-0" aria-label="Clear search">
                 <X size={16} />
               </button>
             )}

@@ -1,12 +1,14 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Home, Search, ArrowLeft } from "lucide-react"
 
-/**
- * 404 Not Found — MyScriptic
- * Uses a Server Component (no "use client") for optimal static rendering.
- * Providers are not needed here — no auth state required for 404.
- */
+export const metadata: Metadata = {
+  title: "Page Not Found",
+  description: "The page you are looking for does not exist or has been moved.",
+  robots: { index: false, follow: false },
+}
+
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">

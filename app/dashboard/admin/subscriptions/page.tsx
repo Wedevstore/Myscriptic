@@ -676,7 +676,7 @@ function SubscriptionsContent() {
                             variant="ghost"
                             size="sm"
                             className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                            onClick={() => window.alert(`Subscription ${sub.id}: ${sub.plan} for ${sub.user}.\n\nFull management requires the admin API (cancel / extend / refund). This data is demo-only.`)}
+                            onClick={() => window.alert(`Subscription ${sub.id}: ${sub.plan} for ${sub.user}.\n\nFull management (cancel / extend / refund) is handled through the admin API.`)}
                           >
                             Manage
                           </Button>

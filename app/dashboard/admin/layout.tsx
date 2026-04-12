@@ -110,7 +110,7 @@ function SidebarNav({ onClose }: { onClose?: () => void }) {
           </Badge>
         </div>
         {onClose && (
-          <button onClick={onClose} className="ml-1 text-sidebar-foreground/50 hover:text-sidebar-foreground">
+          <button onClick={onClose} className="ml-1 text-sidebar-foreground/50 hover:text-sidebar-foreground" aria-label="Close sidebar">
             <X size={16} />
           </button>
         )}
@@ -169,7 +169,7 @@ function SidebarNav({ onClose }: { onClose?: () => void }) {
           <button
             onClick={handleLogout}
             className="opacity-0 group-hover:opacity-100 transition-opacity text-sidebar-foreground/50 hover:text-red-400"
-            title="Sign out"
+            aria-label="Sign out"
           >
             <LogOut size={13} />
           </button>
@@ -228,6 +228,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => setMobileOpen(true)}
             className="lg:hidden text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Open navigation menu"
+            aria-expanded={mobileOpen}
           >
             <Menu size={20} />
           </button>
@@ -292,10 +294,10 @@ function AdminNotifBell() {
     setCount(notificationStore.getAll().filter((n) => !n.isRead).length)
   }, [])
   return (
-    <Link href="/dashboard/admin/notifications" className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+    <Link href="/dashboard/admin/notifications" className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" aria-label={`Notifications${count > 0 ? ` (${count} unread)` : ""}`}>
       <Bell size={16} />
       {count > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center" aria-hidden="true">
           {count > 9 ? "9+" : count}
         </span>
       )}

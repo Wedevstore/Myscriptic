@@ -326,7 +326,7 @@ function RelatedRow({ b }: { b: RelatedBook }) {
         {b.coverUrl ? (
           <img
             src={b.coverUrl}
-            alt=""
+            alt={b.title ?? "Book cover"}
             className="h-full w-full object-cover"
           />
         ) : null}

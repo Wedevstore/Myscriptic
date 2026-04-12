@@ -349,7 +349,7 @@ function LiveAuthorProfile({ authorId }: { authorId: string }) {
                   {c.thumbnail_url ? (
                     <CoverImage
                       src={c.thumbnail_url}
-                      alt=""
+                      alt={c.title ?? "Course thumbnail"}
                       className="group-hover:scale-[1.02] transition-transform duration-500"
                       sizes="(max-width: 1024px) 90vw, 360px"
                     />

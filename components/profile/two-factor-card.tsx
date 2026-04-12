@@ -83,10 +83,18 @@ export function TwoFactorCard({ user, updateUser }: Props) {
   const displayKeyUri =
     pendingOtpauthUri ??
     (pendingSecret != null ? buildTotpKeyUri(user.email, pendingSecret) : "")
-  const qrSrc =
-    displayKeyUri.length > 0
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(displayKeyUri)}`
-      : ""
+  const [qrSrc, setQrSrc] = React.useState("")
+
+  React.useEffect(() => {
+    if (!displayKeyUri) { setQrSrc(""); return }
+    let cancelled = false
+    import("qrcode").then(QRCode => {
+      QRCode.toDataURL(displayKeyUri, { width: 200, margin: 2, errorCorrectionLevel: "M" })
+        .then(url => { if (!cancelled) setQrSrc(url) })
+        .catch(() => { if (!cancelled) setQrSrc("") })
+    })
+    return () => { cancelled = true }
+  }, [displayKeyUri])
 
   function closeSetup(open: boolean) {
     setSetupOpen(open)
@@ -267,7 +275,7 @@ export function TwoFactorCard({ user, updateUser }: Props) {
           {pendingSecret || pendingOtpauthUri ? (
             <div className="space-y-4">
               <div className="flex flex-col items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element -- external QR data URL service */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- data URI generated locally */}
                 <img
                   src={qrSrc}
                   alt="QR code for authenticator setup"
@@ -275,9 +283,6 @@ export function TwoFactorCard({ user, updateUser }: Props) {
                   height={200}
                   className="rounded-lg border border-border bg-white p-2"
                 />
-                <p className="text-center text-[10px] text-muted-foreground">
-                  QR loads from api.qrserver.com (setup only).
-                </p>
               </div>
 
               {pendingSecret ? (

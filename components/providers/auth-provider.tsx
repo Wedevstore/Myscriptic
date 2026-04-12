@@ -1,17 +1,16 @@
 "use client"
 
 /**
- * AuthProvider — Phase 1 Mock Implementation
+ * AuthProvider — Laravel Sanctum Authentication
  *
- * In production this connects to the Laravel Sanctum API:
+ * Connects to the Laravel API:
  *   POST /api/auth/login      → {token, user}
  *   POST /api/auth/register   → {token, user}
  *   POST /api/auth/logout     → {}
  *   GET  /api/auth/me         → {user}
  *
- * For now we persist auth state in localStorage so the UI is fully
- * functional.  Replace each `TODO: REAL_API` comment with the
- * actual fetch call when the Laravel backend is wired up.
+ * Auth state (user + bearer token) is persisted in localStorage
+ * and rehydrated on mount.
  */
 
 import * as React from "react"
@@ -83,76 +82,23 @@ function saveToStorage(user: AuthUser | null, token: string | null) {
   }
 }
 
-/** Matches Laravel `DatabaseSeeder` / `DemoDataSeeder` photo seeds (picsum.photos). */
-const PIC = (seed: string, w: number, h: number) =>
-  `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`
-
 /**
- * Demo-only mock accounts for offline / non-Laravel development.
- * When `laravelAuthEnabled()` is true (production), these are never consulted —
- * login goes through the API and `findMockUser` is skipped entirely.
+ * Dev-only mock accounts — tree-shaken out of production builds.
+ * When `laravelAuthEnabled()` is true the mock path is never entered.
  */
-const MOCK_USERS: (AuthUser & { password: string })[] = [
-  {
-    id: "usr_admin_1",
-    name: "Admin User",
-    email: "admin@myscriptic.com",
-    password: "admin123",
-    role: "admin",
-    avatar: PIC("core-admin-avatar", 160, 160),
-    createdAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "usr_author_1",
-    name: "Jane Austen",
-    email: "author@myscriptic.com",
-    password: "author123",
-    role: "author",
-    avatar: PIC("core-author-jane", 160, 160),
-    createdAt: "2024-01-15T00:00:00Z",
-  },
-  {
-    id: "usr_reader_1",
-    name: "John Reader",
-    email: "reader@myscriptic.com",
-    password: "reader123",
-    role: "user",
-    subscriptionPlan: "Pro Monthly",
-    subscriptionExpiresAt: "2025-12-31T00:00:00Z",
-    avatar: PIC("core-reader-john", 160, 160),
-    createdAt: "2024-02-01T00:00:00Z",
-  },
-  {
-    id: "usr_demo_author",
-    name: "Demo Author Collective",
-    email: "demo.author@demo.myscriptic.test",
-    password: "demo12345",
-    role: "author",
-    avatar: PIC("demo-author-avatar", 160, 160),
-    createdAt: "2026-01-01T00:00:00Z",
-  },
-  {
-    id: "usr_demo_reader",
-    name: "Demo Reader",
-    email: "demo.reader@demo.myscriptic.test",
-    password: "demo12345",
-    role: "user",
-    avatar: PIC("demo-reader-avatar", 160, 160),
-    createdAt: "2026-01-01T00:00:00Z",
-  },
-  {
-    id: "usr_demo_applicant",
-    name: "Demo Applicant",
-    email: "demo.applicant@demo.myscriptic.test",
-    password: "demo12345",
-    role: "user",
-    avatar: PIC("demo-applicant-avatar", 160, 160),
-    createdAt: "2026-01-01T00:00:00Z",
-  },
-]
+function getDevMockUsers(): (AuthUser & { password: string })[] {
+  if (process.env.NODE_ENV === "production") return []
+  const pic = (seed: string, w: number, h: number) =>
+    `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`
+  return [
+    { id: "usr_admin_1", name: "Admin User", email: "admin@myscriptic.com", password: "admin123", role: "admin" as const, avatar: pic("core-admin-avatar", 160, 160), createdAt: "2024-01-01T00:00:00Z" },
+    { id: "usr_author_1", name: "Jane Austen", email: "author@myscriptic.com", password: "author123", role: "author" as const, avatar: pic("core-author-jane", 160, 160), createdAt: "2024-01-15T00:00:00Z" },
+    { id: "usr_reader_1", name: "John Reader", email: "reader@myscriptic.com", password: "reader123", role: "user" as const, subscriptionPlan: "Pro Monthly", subscriptionExpiresAt: "2025-12-31T00:00:00Z", avatar: pic("core-reader-john", 160, 160), createdAt: "2024-02-01T00:00:00Z" },
+  ]
+}
 
 function findMockUser(email: string, password: string) {
-  return MOCK_USERS.find(u => u.email === email && u.password === password) ?? null
+  return getDevMockUsers().find(u => u.email === email && u.password === password) ?? null
 }
 
 export function normalizeAuthUser(raw: unknown): AuthUser {
@@ -282,7 +228,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       await new Promise(r => setTimeout(r, 400))
-      if (MOCK_USERS.find(u => u.email === email)) {
+      const devUsers = getDevMockUsers()
+      if (devUsers.find(u => u.email === email)) {
         return { success: false, error: "An account with this email already exists." }
       }
 
@@ -294,7 +241,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
       }
       const token = `mock_token_${user.id}_${Date.now()}`
-      MOCK_USERS.push({ ...user, password })
       saveToStorage(user, token)
       setState({ user, token, isLoading: false, isAuthenticated: true })
       return { success: true }

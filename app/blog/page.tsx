@@ -102,11 +102,18 @@ function BlogContent() {
   const [nlEmail, setNlEmail] = React.useState("")
   const [nlDone, setNlDone] = React.useState(false)
 
-  const handleNewsletterSubscribe = () => {
+  const handleNewsletterSubscribe = async () => {
     if (!nlEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nlEmail)) return
-    const stored: string[] = JSON.parse(localStorage.getItem("myscriptic-newsletter") ?? "[]")
-    if (!stored.includes(nlEmail)) stored.push(nlEmail)
-    localStorage.setItem("myscriptic-newsletter", JSON.stringify(stored))
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
+      if (apiUrl) {
+        await fetch(`${apiUrl.replace(/\/+$/, "")}/api/newsletter/subscribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ email: nlEmail }),
+        })
+      }
+    } catch { /* best-effort */ }
     setNlDone(true)
   }
 

@@ -268,8 +268,8 @@ function CourseSlugInner() {
                       <div>
                         <p className="font-serif text-lg font-bold text-foreground">Purchase to watch</p>
                         <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-                          {formatCourseAccessLabel(course.accessType, course.price, course.currency)} — individual course
-                          checkout is coming soon. Contact us to arrange access, or explore a reader subscription.
+                          {formatCourseAccessLabel(course.accessType, course.price, course.currency)} — contact us to arrange
+                          access, or explore a reader subscription for unlimited content.
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2 justify-center">

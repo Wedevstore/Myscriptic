@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { authorsApi, contactApi } from "@/lib/api"
-import { apiUrlConfigured, laravelAuthEnabled } from "@/lib/auth-mode"
+import { laravelAuthEnabled } from "@/lib/auth-mode"
 import { resolveMockAuthorId } from "@/lib/mock-data"
 import {
   Mail, MessageSquare, Phone, MapPin, Clock,
@@ -90,17 +90,13 @@ function ContactForm({ authorContext }: { authorContext: ContactAuthorContext | 
     setSubmitError(null)
     setLoading(true)
     try {
-      if (apiUrlConfigured()) {
-        await contactApi.submit({
-          name: form.name,
-          email: form.email,
-          topic: form.topic,
-          message: form.message,
-          author_ref: authorContext?.id,
-        })
-      } else {
-        await new Promise(r => setTimeout(r, 1200))
-      }
+      await contactApi.submit({
+        name: form.name,
+        email: form.email,
+        topic: form.topic,
+        message: form.message,
+        author_ref: authorContext?.id,
+      })
       setSent(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Could not send message. Try again.")

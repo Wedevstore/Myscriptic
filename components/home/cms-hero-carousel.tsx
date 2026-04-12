@@ -108,7 +108,7 @@ export function CmsHeroCarousel({ items }: Props) {
           <div className="relative hidden md:block">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-sidebar-border/30 aspect-[4/3]">
               {b.image_url ? (
-                <CoverImage src={b.image_url} alt="" sizes="(min-width: 1024px) 40vw, 100vw" />
+                <CoverImage src={b.image_url} alt={b.title ?? "Featured content"} sizes="(min-width: 1024px) 40vw, 100vw" />
               ) : (
                 <div className="w-full h-full bg-muted" />
               )}

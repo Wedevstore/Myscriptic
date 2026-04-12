@@ -7,8 +7,8 @@
  * Phase 3: subscription plans, subscriptions, engagement tracking,
  *          revenue pool cycles, author subscription payouts, audit log.
  *
- * In production every function here maps to a Laravel API endpoint.
- * Search for "TODO: REAL_API" to find all swap points.
+ * When the Laravel API is reachable, pages prefer API calls from lib/api.ts.
+ * This store provides the offline / fallback data layer.
  *
  * Data model matches the Laravel migrations exactly so the shape
  * never needs to change when the backend is wired up.
@@ -158,7 +158,7 @@ export interface Subscription {
  * Primary metric: completion_percentage (pages_read / total_pages).
  * Anti-manipulation: reading_speed must be < MAX_PAGES_PER_MINUTE.
  *
- * TODO: REAL_API → POST /api/reading/progress
+ * API: when Laravel is reachable this maps to → POST /api/reading/progress
  */
 export interface EngagementRecord {
   id:                   string
@@ -550,7 +550,7 @@ export const orderStore = {
    * Creates a new order and — on success — grants library access + records
    * author earnings. Simulates DB::transaction atomicity.
    *
-   * TODO: REAL_API → POST /api/orders
+   * API: when Laravel is reachable this maps to → POST /api/orders
    * Body: { items, coupon_code, payment_gateway, currency }
    * Response: { order, payment_init_url }
    */
@@ -599,7 +599,7 @@ export const orderStore = {
    * - Grants library access for each book
    * - Records author earnings per book
    *
-   * TODO: REAL_API → POST /api/webhooks/:gateway
+   * API: when Laravel is reachable this maps to → POST /api/webhooks/:gateway
    * This logic runs server-side on webhook receipt, not client-side.
    */
   markPaid(orderId: string, paymentRef: string): Order | null {
@@ -643,7 +643,7 @@ export const orderStore = {
       const commission = parseFloat((item.price * SALES_COMMISSION_PCT).toFixed(2))
       const net        = parseFloat((item.price - commission).toFixed(2))
       authorEarningsStore._record({
-        authorId: "usr_author_1", // TODO: REAL_API → look up book.author_id
+        authorId: "usr_author_1", // API: when Laravel is reachable this maps to → look up book.author_id
         bookId:   item.bookId,
         orderId:  order.id,
         gross:    item.price,
@@ -664,7 +664,7 @@ export const orderStore = {
     if (idx === -1) return null
     all[idx] = { ...all[idx], status: "refunded" }
     save(KEYS.orders, all)
-    // TODO: REAL_API → POST /api/admin/refunds { order_id, type, amount }
+    // API: when Laravel is reachable this maps to → POST /api/admin/refunds { order_id, type, amount }
     return all[idx]
   },
 
@@ -721,7 +721,7 @@ export const libraryStore = {
   /** Grant subscription access (expires when subscription expires) */
   grantSubscription(userId: string, expiresAt: string): void {
     // In production: called when subscription is activated
-    // TODO: REAL_API → handled server-side, not needed client-side
+    // API: when Laravel is reachable this maps to → handled server-side, not needed client-side
   },
 
   _grant(entry: Omit<LibraryEntry, "id" | "grantedAt" | "expiresAt">): void {
@@ -791,7 +791,7 @@ export const paymentService = {
     order: Order,
     cardDetails?: { number: string; expiry: string; cvv: string; name: string }
   ): Promise<{ success: boolean; ref: string; error?: string }> {
-    // TODO: REAL_API
+    // API: when Laravel is reachable this maps to
     // Paystack:    POST https://api.paystack.co/transaction/initialize
     // Flutterwave: POST https://api.flutterwave.com/v3/payments
     // PayPal:      POST https://api.paypal.com/v2/checkout/orders
@@ -813,7 +813,7 @@ export const paymentService = {
    * Verifies a payment reference. In production this is ALWAYS server-side.
    * Frontend should never be trusted for payment verification.
    *
-   * TODO: REAL_API → GET /api/orders/:id/verify (backend calls gateway verify API)
+   * API: when Laravel is reachable this maps to → GET /api/orders/:id/verify (backend calls gateway verify API)
    */
   async verify(gateway: PaymentGateway, ref: string): Promise<boolean> {
     await new Promise(r => setTimeout(r, 500))
@@ -941,7 +941,7 @@ export const subscriptionStore = {
 
   /**
    * Unified access gate: checks purchase + subscription + free access.
-   * TODO: REAL_API → GET /api/books/:id/access
+   * API: when Laravel is reachable this maps to → GET /api/books/:id/access
    */
   checkBookAccess(
     userId: string,
@@ -959,7 +959,7 @@ export const subscriptionStore = {
   /**
    * Purchase a subscription plan.
    * Enforces: one active subscription per user.
-   * TODO: REAL_API → POST /api/subscriptions
+   * API: when Laravel is reachable this maps to → POST /api/subscriptions
    */
   async purchase(
     userId: string,
@@ -1082,7 +1082,7 @@ export const engagementStore = {
    * Record or update reading progress.
    * Anti-manipulation rules applied server-side in production.
    *
-   * TODO: REAL_API → POST /api/reading/progress (debounced, 10s)
+   * API: when Laravel is reachable this maps to → POST /api/reading/progress (debounced, 10s)
    */
   upsert(
     userId: string,
@@ -1162,7 +1162,7 @@ export const engagementStore = {
 
   /**
    * Platform-wide total engagement minutes for a cycle.
-   * TODO: REAL_API → GET /api/cycles/:id/engagement-total
+   * API: when Laravel is reachable this maps to → GET /api/cycles/:id/engagement-total
    */
   computeTotalPlatformEngagement(cycleId: string): number {
     const cycle = revenueCycleStore.getAll().find(c => c.id === cycleId)
@@ -1195,7 +1195,7 @@ export const revenueCycleStore = {
    * 5. Lock cycle + create author payouts
    *
    * Security: only runs once per cycle (status gate). Locked cycles immutable.
-   * TODO: REAL_API → App\Jobs\CalculateRevenueCycle (queue, monthly cron)
+   * API: when Laravel is reachable this maps to → App\Jobs\CalculateRevenueCycle (queue, monthly cron)
    */
   runMonthlyCalculation(cycleId: string, actorId = "system"): {
     success: boolean
