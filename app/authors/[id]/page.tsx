@@ -356,6 +356,7 @@ function LiveAuthorProfile({ authorId }: { authorId: string }) {
                       alt={c.title ?? "Course thumbnail"}
                       className="group-hover:scale-[1.02] transition-transform duration-500"
                       sizes="(max-width: 1024px) 90vw, 360px"
+                      coverFallbackSeed={c.slug}
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-brand/15 to-brand/5">

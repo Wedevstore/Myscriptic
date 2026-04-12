@@ -3,6 +3,8 @@
 import Image from "next/image"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+import { rewriteS3CoverToCdn } from "@/lib/cover-display"
+import { demoPic } from "@/lib/demo-images"
 
 const COVER_PLACEHOLDER = "/images/book-placeholder.svg"
 
@@ -13,6 +15,10 @@ type CoverImageProps = {
   /** LCP / above-the-fold */
   priority?: boolean
   sizes?: string
+  /**
+   * If the URL still fails (e.g. private S3 with no CDN), show deterministic Picsum art before the SVG placeholder.
+   */
+  coverFallbackSeed?: string
 }
 
 /** Hosts where the Next.js image optimizer should proxy the URL (CDN / placeholders). */
@@ -40,11 +46,22 @@ function normalizeSrc(raw: string): string {
   return t || COVER_PLACEHOLDER
 }
 
-export function CoverImage({ src, alt, className, priority, sizes }: CoverImageProps) {
-  const [resolvedSrc, setResolvedSrc] = useState(() => normalizeSrc(src))
+function initialDisplaySrc(raw: string): string {
+  return rewriteS3CoverToCdn(normalizeSrc(raw))
+}
+
+export function CoverImage({
+  src,
+  alt,
+  className,
+  priority,
+  sizes,
+  coverFallbackSeed,
+}: CoverImageProps) {
+  const [resolvedSrc, setResolvedSrc] = useState(() => initialDisplaySrc(src))
 
   useEffect(() => {
-    setResolvedSrc(normalizeSrc(src))
+    setResolvedSrc(initialDisplaySrc(src))
   }, [src])
 
   return (
@@ -58,7 +75,14 @@ export function CoverImage({ src, alt, className, priority, sizes }: CoverImageP
       unoptimized={!useImageOptimizer(resolvedSrc)}
       priority={priority}
       onError={() => {
-        setResolvedSrc(cur => (cur === COVER_PLACEHOLDER ? cur : COVER_PLACEHOLDER))
+        setResolvedSrc(cur => {
+          if (cur === COVER_PLACEHOLDER) return cur
+          if (cur.includes("picsum.photos")) return COVER_PLACEHOLDER
+          const viaCdn = rewriteS3CoverToCdn(cur)
+          if (viaCdn !== cur) return viaCdn
+          if (coverFallbackSeed) return demoPic(`cover-${coverFallbackSeed}`)
+          return COVER_PLACEHOLDER
+        })
       }}
     />
   )

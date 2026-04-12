@@ -358,6 +358,7 @@ function AuthorBooksContent() {
                             alt={`Cover of ${book.title}`}
                             sizes="40px"
                             className="rounded-md"
+                            coverFallbackSeed={book.id}
                           />
                         </div>
                         <div className="min-w-0">

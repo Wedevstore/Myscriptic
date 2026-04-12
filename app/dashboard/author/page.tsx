@@ -512,6 +512,7 @@ function AuthorDashboardContent() {
                       alt={`Cover of ${book.title}`}
                       sizes="40px"
                       className="rounded-md"
+                      coverFallbackSeed={book.id}
                     />
                   </div>
                   <div className="flex-1 min-w-0">

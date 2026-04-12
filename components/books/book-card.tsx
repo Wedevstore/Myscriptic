@@ -97,6 +97,7 @@ function HorizontalCard({ book }: { book: BookCardData }) {
             alt={`Book cover of ${book.title}`}
             sizes="64px"
             className="group-hover:scale-105 transition-transform duration-300"
+            coverFallbackSeed={book.id}
           />
         </div>
       </Link>
@@ -143,6 +144,7 @@ function CompactCard({ book }: { book: BookCardData }) {
           src={book.coverUrl}
           alt={`Cover of ${book.title}`}
           className="group-hover:scale-105 transition-transform duration-350"
+          coverFallbackSeed={book.id}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="absolute bottom-2 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -242,6 +244,7 @@ function DefaultCard({ book, className }: { book: BookCardData; className?: stri
             src={book.coverUrl}
             alt={`Book cover of ${book.title} by ${book.author}`}
             className="hover:scale-105 transition-transform duration-500"
+            coverFallbackSeed={book.id}
           />
           {/* Cover sheen */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />

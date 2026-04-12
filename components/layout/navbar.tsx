@@ -335,6 +335,7 @@ function SearchPalette({ onClose }: { onClose: () => void }) {
                         src={book.coverUrl}
                         alt={`Cover of ${book.title}`}
                         sizes="40px"
+                        coverFallbackSeed={book.id}
                       />
                     </div>
                     <div className="flex-1 min-w-0">

@@ -82,6 +82,7 @@ export function CourseStrip({
                     alt={`${course.title} course thumbnail`}
                     className="group-hover:scale-[1.02] transition-transform duration-500"
                     sizes="(max-width: 1024px) 90vw, 400px"
+                    coverFallbackSeed={course.id}
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-brand/20 to-brand/5">

@@ -148,6 +148,7 @@ export function HeroSection() {
                 alt="Featured reading content"
                 priority
                 sizes="(min-width: 768px) 42vw, 100vw"
+                coverFallbackSeed={banner.id}
               />
               {/* Dark gradient overlay for text contrast */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
@@ -180,6 +181,7 @@ export function HeroSection() {
                   alt="Trending ebook cover editorial dark style"
                   sizes="56px"
                   className="rounded-lg"
+                  coverFallbackSeed={`${banner.id}-floating`}
                 />
               </div>
             </div>

@@ -10,6 +10,7 @@ import { CourseStrip } from "@/components/home/course-strip"
 import type { BookCardData } from "@/components/books/book-card"
 import type { CmsHomepageBook, CmsHomepageSection } from "@/lib/cms-homepage"
 import { FALLBACK_COVER } from "@/lib/book-mapper"
+import { rewriteS3CoverToCdn } from "@/lib/cover-display"
 
 function toCard(b: CmsHomepageBook): BookCardData {
   const reviewCount =
@@ -20,7 +21,7 @@ function toCard(b: CmsHomepageBook): BookCardData {
     id: b.id,
     title: b.title,
     author: b.author,
-    coverUrl: cover || FALLBACK_COVER,
+    coverUrl: rewriteS3CoverToCdn(cover || FALLBACK_COVER),
     rating,
     reviewCount,
     price: b.price ?? undefined,

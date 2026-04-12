@@ -180,6 +180,7 @@ function BookCard({ book, onAddToCart, inCart }: {
           alt={`Cover of ${book.title} by ${book.author}`}
           sizes="(max-width: 768px) 50vw, 320px"
           className="group-hover:scale-105 transition-transform duration-300"
+          coverFallbackSeed={book.id}
         />
         {book.discount > 0 && (
           <div className="absolute top-2.5 left-2.5 bg-destructive text-destructive-foreground text-[10px] font-bold px-2 py-0.5 rounded-md">

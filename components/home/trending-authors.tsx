@@ -131,6 +131,7 @@ export function TrendingAuthors() {
                         alt={`${author.name} author photo`}
                         sizes="64px"
                         className="rounded-full"
+                        coverFallbackSeed={author.id}
                       />
                     </div>
                   </div>

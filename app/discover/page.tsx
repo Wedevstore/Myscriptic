@@ -455,6 +455,7 @@ function DiscoverContent() {
                     alt={`Cover of ${book.title}`}
                     sizes="64px"
                     className="rounded-lg"
+                    coverFallbackSeed={book.id}
                   />
                 </Link>
                 <div className="flex-1 min-w-0">

@@ -356,6 +356,7 @@ function AudioPlayerContent() {
               alt={`Audiobook cover of ${book.title}`}
               sizes="(max-width: 768px) 224px, 288px"
               className="rounded-3xl"
+              coverFallbackSeed={book.id}
             />
           </div>
           {isPlaying && (

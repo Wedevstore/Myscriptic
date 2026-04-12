@@ -405,6 +405,7 @@ function BookEngagementTable({
                         alt={`Cover of ${book.title}`}
                         sizes="32px"
                         className="rounded"
+                        coverFallbackSeed={book.id}
                       />
                     </div>
                     <div>

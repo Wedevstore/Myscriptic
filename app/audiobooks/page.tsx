@@ -44,6 +44,7 @@ function AudiobookCard({ book }: { book: BookCardData }) {
           src={book.coverUrl}
           alt={`Cover art of audiobook ${book.title}`}
           sizes="(max-width: 768px) 45vw, 280px"
+          coverFallbackSeed={book.id}
         />
         {/* Play overlay */}
         <Link
@@ -115,6 +116,7 @@ function AudiobookListItem({ book }: { book: BookCardData }) {
           alt={`Cover of ${book.title}`}
           sizes="64px"
           className="rounded-xl"
+          coverFallbackSeed={book.id}
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
           <Play size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity fill-white" />

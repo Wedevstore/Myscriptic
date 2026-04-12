@@ -477,12 +477,25 @@ Frontend accepts both `snake_case` and `camelCase` for all fields.
 
 Author uploads use the same upload flow for EPUB and PDF (`book_file_s3_key`); presign should allow `application/epub+zip` and `application/pdf`.
 
+### Book cover URLs (`cover_url`, CMS `image_url`)
+
+Anonymous browser **GET** to the raw S3 object URL must succeed **or** the object must be served via a public CDN/CloudFront distribution. If the bucket blocks public reads, catalog `cover_url` values will 403 in the browser.
+
+**Options (pick one):**
+
+1. **Public CDN / CloudFront** in front of the bucket; set `NEXT_PUBLIC_BOOK_COVER_CDN_BASE` on the Next.js app to that origin (no trailing slash). The frontend rewrites `*.amazonaws.com` URLs to the CDN path.
+2. **API returns signed GET URLs** for `cover_url` (short TTL) instead of raw S3 URLs.
+3. **Bucket policy** allows `s3:GetObject` for `cover/*` (or equivalent) for anonymous principals — least preferred for large catalogs.
+
+Until (1) or (2) is in place, the UI falls back to deterministic placeholder imagery when loads fail.
+
 ---
 
 ## 5. Changelog
 
 | Date | Change | Frontend Files | Backend Impact |
 |------|--------|----------------|----------------|
+| 2026-04-12 | Cover images: CDN rewrite + Picsum fallback | `lib/cover-display.ts`, `components/ui/cover-image.tsx`, `lib/book-mapper.ts`, `components/home/cms-dynamic-home.tsx`, multiple pages using `CoverImage` | **Ops/API:** `cover_url` must be publicly GET-able or fronted by CDN (`NEXT_PUBLIC_BOOK_COVER_CDN_BASE`) or returned as signed URLs — see §4 “Book cover URLs”. |
 | 2026-04-12 | S3 CORS check script | `scripts/check-s3-cors.mjs`, `package.json` | No API change; bucket CORS must allow app origins (see §4) |
 | 2026-04-12 | Ebook reader: S3-first, EPUB MIME on upload | `lib/api.ts`, `app/reader/[id]/page.tsx` | Ensure `POST /library/:id/signed-url` serves `book_file_s3_key`; presign upload accepts `application/epub+zip` |
 | 2026-04-12 | Book chapters: parse, store, fetch | `lib/book-parser.ts`, `lib/api.ts`, `app/reader/[id]/page.tsx` | NEW: `book_chapters` table, `POST/GET /books/:id/chapters` |

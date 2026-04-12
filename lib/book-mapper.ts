@@ -1,4 +1,5 @@
 import type { BookCardData, AccessType, BookFormat } from "@/components/books/book-card"
+import { rewriteS3CoverToCdn } from "@/lib/cover-display"
 import { demoPic } from "@/lib/demo-images"
 
 /** Local placeholder when API/CMS omits or fails to load a cover. */
@@ -158,7 +159,7 @@ export function apiBookToCard(raw: unknown): BookCardData {
     id: String(b.id),
     title: b.title,
     author: b.author,
-    coverUrl: b.coverUrl || FALLBACK_COVER,
+    coverUrl: rewriteS3CoverToCdn(b.coverUrl || FALLBACK_COVER),
     rating: b.rating ?? 0,
     reviewCount: b.reviewCount ?? 0,
     price: b.price ?? undefined,

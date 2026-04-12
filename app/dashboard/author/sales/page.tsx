@@ -282,6 +282,7 @@ function BookSalesRow({ book }: { book: BookSalesStat }) {
             alt={`Cover of ${book.title}`}
             sizes="40px"
             className="rounded-lg"
+            coverFallbackSeed={book.bookId}
           />
         </div>
         <div className="flex-1 min-w-0">

@@ -483,6 +483,7 @@ function BookDetailContent() {
           priority
           sizes="(max-width: 640px) 200px, (max-width: 1024px) 240px, 280px"
           className="rounded-2xl"
+          coverFallbackSeed={book.id}
         />
         {book.isNew && (
           <Badge className="absolute left-3 top-3 bg-brand text-primary-foreground">New</Badge>

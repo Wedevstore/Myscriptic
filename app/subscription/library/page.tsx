@@ -203,6 +203,7 @@ function LibraryBookCard({
           src={book.coverUrl}
           alt={`Cover of ${book.title} by ${book.author}`}
           className="group-hover:scale-105 transition-transform duration-500"
+          coverFallbackSeed={book.id}
         />
         {/* Access badge */}
         <div className="absolute top-2 left-2">
