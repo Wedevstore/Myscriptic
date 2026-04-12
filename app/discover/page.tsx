@@ -11,8 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MOCK_BOOKS, CATEGORIES, TRENDING_AUTHORS } from "@/lib/mock-data"
 import { booksApi, storeApi } from "@/lib/api"
-import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
+import { apiBookToCard } from "@/lib/book-mapper"
 import { apiUrlConfigured } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import {
   TrendingUp, Sparkles, Flame, BookOpen, Headphones,
   Star, Users, ArrowRight, Globe, Award, Zap, GraduationCap,
@@ -56,7 +57,18 @@ const GENRE_SPOTLIGHTS_BASE = [
 type SpotlightSection = (typeof GENRE_SPOTLIGHTS_BASE)[number]
 
 function mapBookRows(rows: unknown[]): BookCardData[] {
-  return rows.map(r => apiBookToCard(r as ApiBookRecord))
+  return rows.map(r => apiBookToCard(r))
+}
+
+const EMPTY_DISCOVER_TABS = {
+  trending: [] as BookCardData[],
+  new: [] as BookCardData[],
+  free: [] as BookCardData[],
+  audio: [] as BookCardData[],
+}
+
+function emptySpotlights(): SpotlightSection[] {
+  return GENRE_SPOTLIGHTS_BASE.map(s => ({ ...s, books: [] as BookCardData[] }))
 }
 
 const READING_CHALLENGES = [
@@ -273,11 +285,16 @@ function DiscoverContent() {
     }
   }, [])
 
-  const tabBooks = live?.tabBooks ?? MOCK_TAB_BOOKS
-  const staffPicks = live?.staffPicks ?? STAFF_PICKS_MOCK
+  const mockFb = allowMockCatalogFallback()
+  const tabBooks = live?.tabBooks ?? (mockFb ? MOCK_TAB_BOOKS : EMPTY_DISCOVER_TABS)
+  const staffPicks = live?.staffPicks ?? (mockFb ? STAFF_PICKS_MOCK : [])
   const tickerTitles =
-    live?.tickerTitles?.length ? live.tickerTitles : MOCK_BOOKS.filter(b => b.isTrending).map(b => b.title)
-  const genreSpotlights = live?.spotlights ?? GENRE_SPOTLIGHTS_BASE
+    live?.tickerTitles?.length
+      ? live.tickerTitles
+      : mockFb
+        ? MOCK_BOOKS.filter(b => b.isTrending).map(b => b.title)
+        : []
+  const genreSpotlights = live?.spotlights ?? (mockFb ? GENRE_SPOTLIGHTS_BASE : emptySpotlights())
 
   if (apiUrlConfigured() && !liveReady) {
     return (

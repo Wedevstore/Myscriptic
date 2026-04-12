@@ -13,7 +13,7 @@ import {
   Bell, Tag, FileText, Settings, Shield, ChevronDown, LogOut,
   Menu, X, Newspaper, Image, Globe, Receipt, TrendingUp,
   UserCheck, Zap, Percent, Hash, Lock, ChevronRight, GraduationCap,
-  UsersRound,
+  UsersRound, Flag,
 } from "lucide-react"
 import { canAccessRoute, type StaffPermission, NAV_PERMISSION_MAP } from "@/lib/staff-permissions"
 
@@ -66,6 +66,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
     items: [
       { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
       { label: "Contact inbox", href: "/dashboard/admin/contact-messages", icon: FileText },
+      { label: "Reports",       href: "/dashboard/admin/reports",     icon: Flag },
       { label: "Activity Log",  href: "/dashboard/admin/activity",    icon: TrendingUp },
       { label: "Staff",         href: "/dashboard/admin/staff",       icon: UsersRound },
       { label: "Settings",      href: "/dashboard/admin/settings",    icon: Settings },
@@ -275,6 +276,7 @@ function Breadcrumb() {
     orders: "Orders", coupons: "Coupons", tax: "Tax Config",
     notifications: "Notifications",
     "contact-messages": "Contact inbox",
+    reports: "Reports",
     activity: "Activity Log",
     staff: "Staff",
     settings: "Settings",

@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { booksApi } from "@/lib/api"
 import { apiUrlConfigured, laravelAuthEnabled } from "@/lib/auth-mode"
 import { demoPic } from "@/lib/demo-images"
+import { parseBookFile, saveParsedBook, type ParsedBook } from "@/lib/book-parser"
 
 type AccessType = "FREE" | "PAID" | "SUBSCRIPTION"
 type BookFormat  = "ebook" | "audiobook" | "magazine"
@@ -112,6 +113,10 @@ function BookUploadForm() {
   const [submitted, setSubmitted] = React.useState(false)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
   const [draftSavedAt, setDraftSavedAt] = React.useState<number | null>(null)
+  const [parsedBook, setParsedBook] = React.useState<ParsedBook | null>(null)
+  const [parsing, setParsing] = React.useState(false)
+  const [parseProgress, setParseProgress] = React.useState<string | null>(null)
+  const [parseError, setParseError] = React.useState<string | null>(null)
 
   const [form, setForm] = React.useState<BookFormState>({
     title: "", description: "", sampleExcerpt: "", category: "", tags: [], tagInput: "",
@@ -197,6 +202,25 @@ function BookUploadForm() {
     set("coverPreview", url)
   }
 
+  const handleBookFile = async (f: File) => {
+    set("bookFile", f)
+    setParsedBook(null)
+    setParseError(null)
+    setParsing(true)
+    setParseProgress("Preparing to parse…")
+    try {
+      const result = await parseBookFile(f, setParseProgress)
+      setParsedBook(result)
+      setParseProgress(null)
+      if (result.title && !form.title) set("title", result.title)
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "Failed to parse book file.")
+      setParseProgress(null)
+    } finally {
+      setParsing(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.title || !form.description || !form.category) return
@@ -228,7 +252,11 @@ function BookUploadForm() {
         if (form.accessType === "PAID") {
           payload.price = parseFloat(form.price)
         }
-        await booksApi.createJson(payload)
+        const res = await booksApi.createJson(payload)
+        const createdId = (res.data as { id?: string | number })?.id
+        if (parsedBook && createdId) {
+          saveParsedBook(String(createdId), parsedBook)
+        }
         clearBookDraft()
         setSubmitting(false)
         setSubmitted(true)
@@ -240,6 +268,10 @@ function BookUploadForm() {
     }
 
     await new Promise(r => setTimeout(r, 1800))
+    if (parsedBook) {
+      const mockId = `uploaded_${Date.now()}`
+      saveParsedBook(mockId, parsedBook)
+    }
     clearBookDraft()
     setSubmitting(false)
     setSubmitted(true)
@@ -515,12 +547,75 @@ function BookUploadForm() {
                 accept=".pdf,.epub"
                 icon={FileText}
                 file={form.bookFile}
-                onFile={f => set("bookFile", f)}
-                hint="PDF or EPUB. Max 100MB"
+                onFile={handleBookFile}
+                hint="PDF or EPUB. Max 100MB — chapters are auto-extracted"
               />
             )}
           </div>
         </section>
+
+        {/* Chapter extraction feedback */}
+        {(parsing || parseError || parsedBook) && (
+          <section className="bg-card border border-border rounded-xl p-6 space-y-4">
+            <h2 className="font-semibold text-foreground flex items-center gap-2">
+              <FileText size={16} className="text-brand" /> Auto-detected Chapters
+            </h2>
+
+            {parsing && (
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <Loader2 size={16} className="animate-spin text-brand" />
+                <span>{parseProgress || "Parsing…"}</span>
+              </div>
+            )}
+
+            {parseError && (
+              <Alert variant="destructive">
+                <AlertDescription>{parseError}</AlertDescription>
+              </Alert>
+            )}
+
+            {parsedBook && !parsing && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <Badge variant="secondary">{parsedBook.format.toUpperCase()}</Badge>
+                  <span className="text-muted-foreground">
+                    {parsedBook.chapters.length} chapter{parsedBook.chapters.length !== 1 ? "s" : ""} detected
+                  </span>
+                  <span className="text-muted-foreground">
+                    ~{Math.round(parsedBook.totalCharacters / 1000)}k characters
+                  </span>
+                </div>
+                {parsedBook.title && (
+                  <p className="text-sm"><span className="font-medium">Embedded title:</span> {parsedBook.title}</p>
+                )}
+                {parsedBook.author && (
+                  <p className="text-sm"><span className="font-medium">Embedded author:</span> {parsedBook.author}</p>
+                )}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-muted/50 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Table of Contents
+                  </div>
+                  <div className="max-h-60 overflow-y-auto divide-y divide-border">
+                    {parsedBook.chapters.map((ch, i) => (
+                      <div key={i} className="px-4 py-2.5 flex items-baseline gap-3 text-sm">
+                        <span className="text-xs tabular-nums text-muted-foreground w-6 shrink-0 text-right">{i + 1}</span>
+                        <span className="font-medium text-foreground flex-1 truncate">{ch.title}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {ch.content.length > 1000
+                            ? `${(ch.content.length / 1000).toFixed(1)}k chars`
+                            : `${ch.content.length} chars`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Chapters will be available for navigation in the reader. You can reorder or rename them after publication from the dashboard.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Submit */}
         <div className="space-y-2">

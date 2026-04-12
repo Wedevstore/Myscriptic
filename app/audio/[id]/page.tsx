@@ -8,7 +8,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { booksApi } from "@/lib/api"
-import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
+import { apiBookToCard, pickAudiobookStreamUrl } from "@/lib/book-mapper"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 import {
@@ -39,6 +39,13 @@ function formatTime(seconds: number): string {
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2]
 
+function chapterListTotalSeconds(): number {
+  return CHAPTERS.reduce(
+    (s, c) => s + parseInt(c.duration.split(":")[0], 10) * 60 + parseInt(c.duration.split(":")[1], 10),
+    0
+  )
+}
+
 type PlayerBookMeta = { id: string; title: string; author: string; coverUrl: string }
 
 function AudioPlayerContent() {
@@ -50,6 +57,12 @@ function AudioPlayerContent() {
 
   const [remoteMeta, setRemoteMeta] = React.useState<PlayerBookMeta | null>(null)
   const [metaLoading, setMetaLoading] = React.useState(false)
+  const [streamUrl, setStreamUrl] = React.useState<string | null>(null)
+  const [audioDuration, setAudioDuration] = React.useState<number | null>(null)
+  const audioRef = React.useRef<HTMLAudioElement | null>(null)
+
+  const demoStream =
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_AUDIOBOOK_DEMO_STREAM_URL?.trim()) || ""
 
   const fallbackMeta = React.useMemo<PlayerBookMeta>(() => {
     const m =
@@ -65,25 +78,41 @@ function AudioPlayerContent() {
   }, [routeId])
 
   React.useEffect(() => {
-    if (!useApi || !routeId) return
-    if (isLoading || !isAuthenticated) return
+    if (!useApi || !routeId) {
+      setStreamUrl(demoStream || null)
+      return
+    }
+    if (isLoading || !isAuthenticated) {
+      setStreamUrl(null)
+      setAudioDuration(null)
+      return
+    }
     let cancelled = false
     setRemoteMeta(null)
+    setStreamUrl(null)
+    setAudioDuration(null)
+    setProgress(0)
     setMetaLoading(true)
     booksApi
       .get(routeId)
       .then(res => {
         if (cancelled) return
-        const card = apiBookToCard(res.data as ApiBookRecord)
+        const payload = res.data as unknown
+        const card = apiBookToCard(payload)
         setRemoteMeta({
           id: card.id,
           title: card.title,
           author: card.author,
           coverUrl: card.coverUrl,
         })
+        const fromApi = pickAudiobookStreamUrl(payload)
+        setStreamUrl(fromApi || demoStream || null)
       })
       .catch(() => {
-        if (!cancelled) setRemoteMeta(null)
+        if (!cancelled) {
+          setRemoteMeta(null)
+          setStreamUrl(demoStream || null)
+        }
       })
       .finally(() => {
         if (!cancelled) setMetaLoading(false)
@@ -91,10 +120,12 @@ function AudioPlayerContent() {
     return () => {
       cancelled = true
     }
-  }, [useApi, routeId, isLoading, isAuthenticated])
+  }, [useApi, routeId, isLoading, isAuthenticated, demoStream])
 
   const book = remoteMeta ?? fallbackMeta
-  const TOTAL_DURATION = CHAPTERS.reduce((s, c) => s + parseInt(c.duration.split(":")[0]) * 60 + parseInt(c.duration.split(":")[1]), 0)
+  const simTotalDuration = React.useMemo(() => chapterListTotalSeconds(), [])
+  const totalPlaySeconds =
+    streamUrl && audioDuration && audioDuration > 0 ? audioDuration : simTotalDuration
 
   const [isPlaying,  setIsPlaying]  = React.useState(false)
   const [progress,   setProgress]   = React.useState(0)   // 0–100
@@ -115,12 +146,73 @@ function AudioPlayerContent() {
     }
   }, [isLoading, isAuthenticated, router, routeId])
 
-  // Simulate playback progress
   React.useEffect(() => {
+    const el = audioRef.current
+    if (!streamUrl || !el) return
+    el.src = streamUrl
+    el.load()
+  }, [streamUrl])
+
+  React.useEffect(() => {
+    const el = audioRef.current
+    if (!el || !streamUrl) return
+    el.playbackRate = speed
+  }, [speed, streamUrl])
+
+  React.useEffect(() => {
+    if (!streamUrl) return
+    const el = audioRef.current
+    if (!el) return
+    const onMeta = () => {
+      if (Number.isFinite(el.duration) && el.duration > 0) setAudioDuration(el.duration)
+    }
+    const onTime = () => {
+      const d = el.duration
+      if (!Number.isFinite(d) || d <= 0) return
+      setProgress((el.currentTime / d) * 100)
+    }
+    const onEnded = () => {
+      setIsPlaying(false)
+      if (looping) {
+        el.currentTime = 0
+        void el.play().catch(() => {})
+        setIsPlaying(true)
+      } else {
+        setProgress(100)
+      }
+    }
+    el.addEventListener("loadedmetadata", onMeta)
+    el.addEventListener("timeupdate", onTime)
+    el.addEventListener("ended", onEnded)
+    return () => {
+      el.removeEventListener("loadedmetadata", onMeta)
+      el.removeEventListener("timeupdate", onTime)
+      el.removeEventListener("ended", onEnded)
+    }
+  }, [streamUrl, looping])
+
+  React.useEffect(() => {
+    if (!streamUrl) return
+    const el = audioRef.current
+    if (!el) return
     if (isPlaying) {
+      void el.play().catch(() => setIsPlaying(false))
+    } else {
+      el.pause()
+    }
+  }, [isPlaying, streamUrl])
+
+  // Simulated progress when no stream URL is available
+  React.useEffect(() => {
+    if (streamUrl) {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      return
+    }
+    if (isPlaying) {
+      const dur = Math.max(simTotalDuration, 1)
       intervalRef.current = setInterval(() => {
         setProgress(p => {
-          const next = p + (100 / TOTAL_DURATION) * speed
+          const next = p + (100 / dur) * speed
           if (next >= 100) {
             setIsPlaying(false)
             return looping ? 0 : 100
@@ -131,20 +223,26 @@ function AudioPlayerContent() {
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [isPlaying, speed, looping, TOTAL_DURATION])
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [isPlaying, speed, looping, streamUrl, simTotalDuration])
 
-  // Update active chapter based on progress
   React.useEffect(() => {
-    const currentSec = (progress / 100) * TOTAL_DURATION
+    const totalDur = Math.max(totalPlaySeconds, 1)
+    const currentSecWall = (progress / 100) * totalDur
+    const virtualSec = streamUrl ? (currentSecWall / totalDur) * simTotalDuration : currentSecWall
     let idx = 0
     for (let i = CHAPTERS.length - 1; i >= 0; i--) {
-      if (currentSec >= CHAPTERS[i].startSec) { idx = i; break }
+      if (virtualSec >= CHAPTERS[i].startSec) {
+        idx = i
+        break
+      }
     }
     setActiveChap(idx)
-  }, [progress, TOTAL_DURATION])
+  }, [progress, totalPlaySeconds, simTotalDuration, streamUrl])
 
-  const currentSec = Math.round((progress / 100) * TOTAL_DURATION)
+  const currentSec = Math.round((progress / 100) * Math.max(totalPlaySeconds, 1))
 
   const cycleSpeed = () => {
     const next = (speedIdx + 1) % SPEEDS.length
@@ -152,18 +250,52 @@ function AudioPlayerContent() {
     setSpeed(SPEEDS[next])
   }
 
-  const skipBack    = () => setProgress(p => Math.max(0, p - (15 / TOTAL_DURATION) * 100))
-  const skipForward = () => setProgress(p => Math.min(100, p + (30 / TOTAL_DURATION) * 100))
+  const skipBack = () => {
+    const el = audioRef.current
+    const dur = Math.max(totalPlaySeconds, 1)
+    if (streamUrl && el) {
+      el.currentTime = Math.max(0, el.currentTime - 15)
+      return
+    }
+    setProgress(p => Math.max(0, p - (15 / dur) * 100))
+  }
+  const skipForward = () => {
+    const el = audioRef.current
+    const dur = Math.max(totalPlaySeconds, 1)
+    if (streamUrl && el) {
+      el.currentTime = Math.min(dur, el.currentTime + 30)
+      return
+    }
+    setProgress(p => Math.min(100, p + (30 / dur) * 100))
+  }
   const prevChap = () => {
     const idx = Math.max(0, activeChap - 1)
-    setProgress((CHAPTERS[idx].startSec / TOTAL_DURATION) * 100)
+    const ratio = CHAPTERS[idx].startSec / simTotalDuration
+    const el = audioRef.current
+    if (streamUrl && el && audioDuration && audioDuration > 0) {
+      el.currentTime = ratio * audioDuration
+    } else {
+      setProgress(ratio * 100)
+    }
   }
   const nextChap = () => {
     const idx = Math.min(CHAPTERS.length - 1, activeChap + 1)
-    setProgress((CHAPTERS[idx].startSec / TOTAL_DURATION) * 100)
+    const ratio = CHAPTERS[idx].startSec / simTotalDuration
+    const el = audioRef.current
+    if (streamUrl && el && audioDuration && audioDuration > 0) {
+      el.currentTime = ratio * audioDuration
+    } else {
+      setProgress(ratio * 100)
+    }
   }
   const jumpToChap = (idx: number) => {
-    setProgress((CHAPTERS[idx].startSec / TOTAL_DURATION) * 100)
+    const ratio = CHAPTERS[idx].startSec / simTotalDuration
+    const el = audioRef.current
+    if (streamUrl && el && audioDuration && audioDuration > 0) {
+      el.currentTime = ratio * audioDuration
+    } else {
+      setProgress(ratio * 100)
+    }
     setIsPlaying(true)
     setShowChaps(false)
   }
@@ -200,6 +332,9 @@ function AudioPlayerContent() {
         outerClassName="flex flex-col flex-1 min-h-0"
         innerClassName="flex flex-col flex-1 min-h-0"
       >
+      {streamUrl ? (
+        <audio ref={audioRef} preload="metadata" className="hidden" crossOrigin="anonymous" aria-hidden />
+      ) : null}
       {/* Main Player */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 max-w-lg mx-auto w-full gap-8">
         {/* Cover art */}
@@ -237,12 +372,19 @@ function AudioPlayerContent() {
           <Slider
             min={0} max={100} step={0.1}
             value={[progress]}
-            onValueChange={([v]) => { setProgress(v) }}
+            onValueChange={([v]) => {
+              setProgress(v)
+              const el = audioRef.current
+              const d = audioDuration && audioDuration > 0 ? audioDuration : 0
+              if (streamUrl && el && d > 0) {
+                el.currentTime = (v / 100) * d
+              }
+            }}
             className="w-full"
           />
           <div className="flex justify-between text-xs text-sidebar-foreground/50">
             <span>{formatTime(currentSec)}</span>
-            <span>-{formatTime(TOTAL_DURATION - currentSec)}</span>
+            <span>-{formatTime(Math.max(0, Math.round(totalPlaySeconds) - currentSec))}</span>
           </div>
         </div>
 

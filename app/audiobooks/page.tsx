@@ -11,8 +11,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { BookCardData } from "@/components/books/book-card"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 import { booksApi } from "@/lib/api"
-import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
+import { apiBookToCard } from "@/lib/book-mapper"
 import { apiUrlConfigured } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { Headphones, Play, Clock, Star, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -149,8 +150,11 @@ function AudiobookListItem({ book }: { book: BookCardData }) {
 
 function AudiobooksContent() {
   const useLiveApi = apiUrlConfigured()
+  const mockFallback = allowMockCatalogFallback()
   const [activeGenre, setActiveGenre] = React.useState("All")
-  const [books, setBooks] = React.useState<BookCardData[]>(MOCK_AUDIOBOOKS)
+  const [books, setBooks] = React.useState<BookCardData[]>(() =>
+    mockFallback ? MOCK_AUDIOBOOKS : []
+  )
   const [loading, setLoading] = React.useState(useLiveApi)
 
   React.useEffect(() => {
@@ -167,12 +171,14 @@ function AudiobooksContent() {
         if (cancelled) return
         const rows = (res.data as unknown[]) ?? []
         const audio = rows
-          .map(r => apiBookToCard(r as ApiBookRecord))
+          .map(r => apiBookToCard(r))
           .filter(b => b.format === "audiobook")
-        setBooks(audio.length ? audio : MOCK_AUDIOBOOKS)
+        if (audio.length) setBooks(audio)
+        else if (mockFallback) setBooks(MOCK_AUDIOBOOKS)
+        else setBooks([])
       })
       .catch(() => {
-        if (!cancelled) setBooks(MOCK_AUDIOBOOKS)
+        if (!cancelled) setBooks(mockFallback ? MOCK_AUDIOBOOKS : [])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -180,7 +186,7 @@ function AudiobooksContent() {
     return () => {
       cancelled = true
     }
-  }, [useLiveApi])
+  }, [useLiveApi, mockFallback])
 
   const filtered = activeGenre === "All"
     ? books

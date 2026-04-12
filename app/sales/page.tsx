@@ -11,8 +11,9 @@ import { Badge } from "@/components/ui/badge"
 import type { BookCardData } from "@/components/books/book-card"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 import { storeApi } from "@/lib/api"
-import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
+import { apiBookToCard } from "@/lib/book-mapper"
 import { apiUrlConfigured } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { Zap, Clock, Tag, ChevronRight, Flame } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -44,7 +45,7 @@ function mockSaleBooks(): SaleBook[] {
 /** Store catalog: show 50% off promotional pricing (UI-only; checkout uses real prices). */
 function storeRowsToSaleBooks(rows: unknown[]): SaleBook[] {
   return rows.map(r => {
-    const card = apiBookToCard(r as ApiBookRecord)
+    const card = apiBookToCard(r)
     const orig = card.price ?? 0
     const sale = orig ? Math.round(orig * 0.5 * 100) / 100 : 0
     return {
@@ -82,8 +83,11 @@ function TimeUnit({ value, label }: { value: string; label: string }) {
 
 function SalesContent() {
   const { h, m, s } = useCountdown(8 * 3_600_000)
+  const mockFallback = allowMockCatalogFallback()
   const [activeFilter, setActiveFilter] = React.useState("all")
-  const [saleBooks, setSaleBooks] = React.useState<SaleBook[]>(() => mockSaleBooks())
+  const [saleBooks, setSaleBooks] = React.useState<SaleBook[]>(() =>
+    mockFallback ? mockSaleBooks() : []
+  )
   const [loading, setLoading] = React.useState(() => apiUrlConfigured())
 
   React.useEffect(() => {
@@ -100,10 +104,12 @@ function SalesContent() {
         if (cancelled) return
         const rows = (res.data as unknown[]) ?? []
         const mapped = storeRowsToSaleBooks(rows)
-        setSaleBooks(mapped.length ? mapped : mockSaleBooks())
+        if (mapped.length) setSaleBooks(mapped)
+        else if (mockFallback) setSaleBooks(mockSaleBooks())
+        else setSaleBooks([])
       })
       .catch(() => {
-        if (!cancelled) setSaleBooks(mockSaleBooks())
+        if (!cancelled) setSaleBooks(mockFallback ? mockSaleBooks() : [])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -111,7 +117,7 @@ function SalesContent() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [mockFallback])
 
   const filters = [
     { id: "all", label: "All Deals" },

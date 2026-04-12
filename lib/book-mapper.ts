@@ -1,4 +1,4 @@
-import type { BookCardData } from "@/components/books/book-card"
+import type { BookCardData, AccessType, BookFormat } from "@/components/books/book-card"
 import { demoPic } from "@/lib/demo-images"
 
 /** Shape returned by Laravel book list/search payloads (camelCase JSON). */
@@ -21,7 +21,121 @@ export type ApiBookRecord = {
   isTrending?: boolean
 }
 
-export function apiBookToCard(b: ApiBookRecord): BookCardData {
+function str(v: unknown): string | undefined {
+  if (v == null) return undefined
+  const s = String(v).trim()
+  return s.length > 0 ? s : undefined
+}
+
+function num(v: unknown): number | null {
+  if (v == null || v === "") return null
+  const n = typeof v === "number" ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function parseFormat(raw: unknown): BookFormat {
+  const s = (str(raw) ?? "ebook").toLowerCase().replace(/-/g, "_")
+  if (s === "audiobook" || s === "audio_book" || s === "audio") return "audiobook"
+  if (s === "magazine") return "magazine"
+  return "ebook"
+}
+
+function parseAccess(raw: unknown): AccessType {
+  const s = (str(raw) ?? "FREE").toUpperCase().replace(/-/g, "_")
+  if (s === "PAID" || s === "SUBSCRIPTION" || s === "FREE") return s
+  return "FREE"
+}
+
+/**
+ * Unwrap Laravel JSON:API style `{ data: { attributes } }` or flat objects.
+ */
+function unwrapBookRow(raw: unknown): Record<string, unknown> | null {
+  if (raw == null || typeof raw !== "object") return null
+  const o = raw as Record<string, unknown>
+  const inner = o.data
+  if (inner != null && typeof inner === "object" && !Array.isArray(inner)) {
+    const d = inner as Record<string, unknown>
+    const attrs = d.attributes
+    if (attrs != null && typeof attrs === "object" && !Array.isArray(attrs)) {
+      return { id: d.id ?? o.id, ...(attrs as Record<string, unknown>) }
+    }
+    return d
+  }
+  return o
+}
+
+/**
+ * Normalize Laravel snake_case, camelCase, or JSON:API rows into {@link ApiBookRecord}.
+ */
+export function normalizeApiBookRecord(raw: unknown): ApiBookRecord | null {
+  const o = unwrapBookRow(raw)
+  if (!o) return null
+  const id = o.id
+  if (id === undefined || id === null) return null
+
+  const title = str(o.title) ?? "Untitled"
+  const author = str(o.author) ?? "Unknown"
+
+  return {
+    id: id as string | number,
+    title,
+    author,
+    sampleExcerpt: str(o.sample_excerpt ?? o.sampleExcerpt) ?? null,
+    openingExcerpt: str(o.opening_excerpt ?? o.openingExcerpt) ?? null,
+    coverUrl: str(o.cover_url ?? o.coverUrl) ?? null,
+    rating: num(o.rating),
+    reviewCount: num(o.review_count ?? o.reviewCount),
+    price: num(o.price),
+    currency: str(o.currency) ?? null,
+    accessType: parseAccess(o.access_type ?? o.accessType),
+    format: parseFormat(o.format),
+    category: str(o.category) ?? null,
+    isNew: Boolean(o.is_new ?? o.isNew),
+    isTrending: Boolean(o.is_trending ?? o.isTrending),
+  }
+}
+
+const STREAM_KEYS = [
+  "audiobook_url",
+  "audiobookUrl",
+  "audio_url",
+  "audioUrl",
+  "stream_url",
+  "streamUrl",
+  "audio_stream_url",
+  "audioStreamUrl",
+] as const
+
+/**
+ * First HTTPS/audio URL from a book API payload (flat or JSON:API unwrapped).
+ */
+export function pickAudiobookStreamUrl(raw: unknown): string | null {
+  const o = unwrapBookRow(raw)
+  if (!o) return null
+  for (const k of STREAM_KEYS) {
+    const u = str(o[k])
+    if (u && (u.startsWith("https://") || u.startsWith("http://") || u.startsWith("/"))) {
+      return u
+    }
+  }
+  return null
+}
+
+export function apiBookToCard(raw: unknown): BookCardData {
+  const b = normalizeApiBookRecord(raw)
+  if (!b) {
+    return {
+      id: "0",
+      title: "Untitled",
+      author: "Unknown",
+      coverUrl: demoPic("fallback-cover"),
+      rating: 0,
+      reviewCount: 0,
+      accessType: "FREE",
+      format: "ebook",
+      category: "General",
+    }
+  }
   return {
     id: String(b.id),
     title: b.title,

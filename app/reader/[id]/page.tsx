@@ -36,8 +36,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ProtectedSurface } from "@/components/protected-surface"
+import { loadParsedBook, type ParsedChapter } from "@/lib/book-parser"
 
-// ── Book content (mock pages — in prod fetched from CDN per chapter) ───────────
+// ── Fallback mock content (shown when no parsed book is available) ────────────
 const MOCK_PAGES = [
   {
     page: 1,
@@ -125,7 +126,15 @@ Adaeze turned to the title page. The name written there was simply: ZARA.`,
   },
 ]
 
-const TOTAL_PAGES = 342 // the "real" book length (engagement is computed against this)
+/** Convert parsed chapters to the page shape the reader uses internally. */
+function chaptersToPages(chapters: ParsedChapter[]): { page: number; content: string }[] {
+  return chapters.map((ch, i) => ({
+    page: i + 1,
+    content: `${ch.title}\n\n${ch.content}`,
+  }))
+}
+
+const TOTAL_PAGES_FALLBACK = 342
 
 type Theme    = "light" | "dark" | "sepia"
 type FontSize = 14 | 16 | 18 | 20 | 22
@@ -260,10 +269,12 @@ function readerTocAside(theme: Theme) {
   return "bg-white"
 }
 
-const TOC_FROM_PAGES = MOCK_PAGES.map(p => ({
-  page: p.page,
-  label: (p.content.split("\n")[0] ?? `Page ${p.page}`).trim().slice(0, 96),
-}))
+function buildToc(pages: { page: number; content: string }[]) {
+  return pages.map(p => ({
+    page: p.page,
+    label: (p.content.split("\n")[0] ?? `Page ${p.page}`).trim().slice(0, 96),
+  }))
+}
 
 // ── Access Denied Screens ─────────────────────────────────────────────────────
 
@@ -467,6 +478,23 @@ function ReaderContent() {
   /** Stable id for engagement + progress APIs (numeric Laravel id vs mock `bk_*`). */
   const engagementBookId = /^\d+$/.test(routeId) ? routeId : book.id
 
+  // ── Load parsed chapters if available ──────────────────────────────────────
+  const [readerPages, setReaderPages] = React.useState(() => MOCK_PAGES)
+  const [hasParsedContent, setHasParsedContent] = React.useState(false)
+  const totalPages = hasParsedContent ? readerPages.length : TOTAL_PAGES_FALLBACK
+  const tocEntries = React.useMemo(() => buildToc(readerPages), [readerPages])
+
+  React.useEffect(() => {
+    const parsed = loadParsedBook(engagementBookId)
+    if (parsed && parsed.chapters.length > 0) {
+      setReaderPages(chaptersToPages(parsed.chapters))
+      setHasParsedContent(true)
+    } else {
+      setReaderPages(MOCK_PAGES)
+      setHasParsedContent(false)
+    }
+  }, [engagementBookId])
+
   // ── Access check ────────────────────────────────────────────────────────────
   const [accessState, setAccessState] = React.useState<
     "checking" | "allowed" | "denied_subscription" | "denied_paid"
@@ -541,6 +569,8 @@ function ReaderContent() {
   readingLayoutRef.current = readingLayout
   const currentPageRef = React.useRef(currentPage)
   currentPageRef.current = currentPage
+  const readerPagesRef = React.useRef(readerPages)
+  readerPagesRef.current = readerPages
   const readerHelpOpenRef = React.useRef(readerHelpOpen)
   const showTocRef = React.useRef(showToc)
   readerHelpOpenRef.current = readerHelpOpen
@@ -576,7 +606,7 @@ function ReaderContent() {
     if (laravelPhase3Enabled() && /^\d+$/.test(routeId)) {
       progressApi.get(routeId).then(r => {
         if (r.page_number > 0) {
-          const p = Math.min(r.page_number, MOCK_PAGES.length)
+          const p = Math.min(r.page_number, readerPages.length)
           setCurrentPage(p)
           requestAnimationFrame(() => {
             if (readingLayoutRef.current === "vertical") scrollVerticalToSection(p, "auto")
@@ -585,7 +615,7 @@ function ReaderContent() {
       }).catch(() => {
         const saved = engagementStore.getByUserBook(user.id, engagementBookId)
         if (saved && saved.pagesRead > 0) {
-          const restored = Math.min(saved.pagesRead, MOCK_PAGES.length)
+          const restored = Math.min(saved.pagesRead, readerPages.length)
           setCurrentPage(restored)
           requestAnimationFrame(() => {
             if (readingLayoutRef.current === "vertical") scrollVerticalToSection(restored, "auto")
@@ -596,13 +626,13 @@ function ReaderContent() {
     }
     const saved = engagementStore.getByUserBook(user.id, engagementBookId)
     if (saved && saved.pagesRead > 0) {
-      const restored = Math.min(saved.pagesRead, MOCK_PAGES.length)
+      const restored = Math.min(saved.pagesRead, readerPages.length)
       setCurrentPage(restored)
       requestAnimationFrame(() => {
         if (readingLayoutRef.current === "vertical") scrollVerticalToSection(restored, "auto")
       })
     }
-  }, [accessState, user, engagementBookId, routeId, scrollVerticalToSection])
+  }, [accessState, user, engagementBookId, routeId, scrollVerticalToSection, readerPages])
 
   React.useEffect(() => {
     try {
@@ -703,7 +733,7 @@ function ReaderContent() {
   const goTo = React.useCallback(
     (page: number) => {
       setAutoScrollOn(false)
-      const p = Math.max(1, Math.min(page, MOCK_PAGES.length))
+      const p = Math.max(1, Math.min(page, readerPagesRef.current.length))
       setCurrentPage(p)
       queueMicrotask(() => {
         if (readingLayoutRef.current === "vertical") scrollVerticalToSection(p, "smooth")
@@ -728,7 +758,7 @@ function ReaderContent() {
       } else if (e.key === "ArrowRight") {
         e.preventDefault()
         setCurrentPage(p => {
-          const next = Math.min(MOCK_PAGES.length, p + 1)
+          const next = Math.min(readerPagesRef.current.length, p + 1)
           queueMicrotask(() => {
             if (readingLayoutRef.current === "vertical") scrollVerticalToSection(next, "smooth")
           })
@@ -893,7 +923,7 @@ function ReaderContent() {
       const w = el.clientWidth
       if (w <= 0) return
       const idx = Math.round(el.scrollLeft / w)
-      const page = Math.min(MOCK_PAGES.length, Math.max(1, idx + 1))
+      const page = Math.min(readerPagesRef.current.length, Math.max(1, idx + 1))
       setCurrentPage(prev => (prev === page ? prev : page))
     }
     el.addEventListener("scroll", onScroll, { passive: true })
@@ -954,7 +984,7 @@ function ReaderContent() {
   /** Vertical scroll: update current section from viewport (no scroll — avoids fighting the reader). */
   React.useEffect(() => {
     if (readingLayout !== "vertical") return
-    const roots = MOCK_PAGES.map(p => document.getElementById(`reader-section-${p.page}`)).filter(
+    const roots = readerPagesRef.current.map(p => document.getElementById(`reader-section-${p.page}`)).filter(
       (n): n is HTMLElement => n != null
     )
     if (roots.length === 0) return
@@ -980,7 +1010,7 @@ function ReaderContent() {
       cancelAnimationFrame(raf)
       io.disconnect()
     }
-  }, [readingLayout])
+  }, [readingLayout, readerPages])
 
   /** Vertical continuous scroll: smooth auto-advance at user-chosen px/s. */
   React.useEffect(() => {
@@ -1039,10 +1069,10 @@ function ReaderContent() {
     user?.id ?? "anonymous",
     engagementBookId,
     currentPage,
-    TOTAL_PAGES
+    totalPages
   )
 
-  const progressPct = Math.round((currentPage / TOTAL_PAGES) * 100)
+  const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0
   const styles      = THEME_STYLES[theme]
 
   const saveBookmark = React.useCallback(() => {
@@ -1056,7 +1086,7 @@ function ReaderContent() {
 
   const goToBookmark = React.useCallback(() => {
     if (bookmarkPage == null) return
-    goTo(Math.max(1, Math.min(bookmarkPage, MOCK_PAGES.length)))
+    goTo(Math.max(1, Math.min(bookmarkPage, readerPagesRef.current.length)))
   }, [bookmarkPage, goTo])
 
   const toggleAutoScroll = React.useCallback(() => {
@@ -1246,7 +1276,7 @@ function ReaderContent() {
                       theme === "light" && "text-gray-500"
                     )}
                   >
-                    p.{currentPage}/{MOCK_PAGES.length}
+                    p.{currentPage}/{readerPages.length}
                   </span>
                   <span
                     className={cn(
@@ -2037,8 +2067,17 @@ function ReaderContent() {
                 />
               </button>
             </div>
+            {hasParsedContent && (
+              <div className={cn(
+                "mx-4 mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium",
+                theme === "dark" ? "bg-emerald-900/20 text-emerald-400" : "bg-emerald-50 text-emerald-700"
+              )}>
+                <CheckCircle size={13} />
+                {readerPages.length} chapter{readerPages.length !== 1 ? "s" : ""} extracted from file
+              </div>
+            )}
             <div className="p-4 space-y-1">
-              {TOC_FROM_PAGES.map(entry => (
+              {tocEntries.map((entry, i) => (
                 <button
                   key={entry.page}
                   type="button"
@@ -2057,7 +2096,9 @@ function ReaderContent() {
                           : "text-gray-700 hover:bg-gray-50"
                   )}
                 >
-                  <span className="text-[10px] text-muted-foreground block tabular-nums">Page {entry.page}</span>
+                  <span className="text-[10px] text-muted-foreground block tabular-nums">
+                    {hasParsedContent ? `Chapter ${i + 1}` : `Page ${entry.page}`}
+                  </span>
                   {entry.label}
                 </button>
               ))}
@@ -2090,12 +2131,12 @@ function ReaderContent() {
                       theme === "light" && "text-gray-500"
                     )}
                   >
-                    <span>Sample section</span>
+                    <span>{hasParsedContent ? "Chapter" : "Sample section"}</span>
                     <span className="font-semibold tabular-nums">
-                      {currentPage} / {MOCK_PAGES.length}
+                      {currentPage} / {readerPages.length}
                     </span>
                   </div>
-                  <Progress value={(currentPage / TOTAL_PAGES) * 100} className="h-1.5" />
+                  <Progress value={(currentPage / totalPages) * 100} className="h-1.5" />
                   <div
                     className={cn(
                       "flex justify-between text-xs",
@@ -2105,7 +2146,7 @@ function ReaderContent() {
                     )}
                   >
                     <span>Title progress</span>
-                    <span className="font-semibold tabular-nums">{((currentPage / TOTAL_PAGES) * 100).toFixed(1)}%</span>
+                    <span className="font-semibold tabular-nums">{((currentPage / totalPages) * 100).toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
@@ -2127,8 +2168,8 @@ function ReaderContent() {
       >
         <p className="sr-only" aria-live="polite" aria-atomic="true">
           {readingLayout === "horizontal"
-            ? `Section ${currentPage} of ${MOCK_PAGES.length}. Swipe horizontally or use arrow keys.`
-            : `Scroll to read. Active section ${currentPage} of ${MOCK_PAGES.length}. Arrow keys jump between sections.`}
+            ? `Section ${currentPage} of ${readerPages.length}. Swipe horizontally or use arrow keys.`
+            : `Scroll to read. Active section ${currentPage} of ${readerPages.length}. Arrow keys jump between sections.`}
         </p>
         <ProtectedSurface
           active={accessState === "allowed"}
@@ -2151,7 +2192,7 @@ function ReaderContent() {
         >
           {readingLayout === "vertical" ? (
             <article className={cn(fontFamily === "serif" ? "font-serif" : "font-sans")}>
-              {MOCK_PAGES.map(p => (
+              {readerPages.map(p => (
                 <section
                   key={p.page}
                   id={`reader-section-${p.page}`}
@@ -2172,7 +2213,7 @@ function ReaderContent() {
               )}
               aria-label="Paginated sections — swipe left or right"
             >
-              {MOCK_PAGES.map(p => (
+              {readerPages.map(p => (
                 <div
                   key={p.page}
                   className={cn(
@@ -2333,12 +2374,12 @@ function ReaderContent() {
                 theme === "light" && "text-gray-500"
               )}
             >
-              Page {currentPage} of {MOCK_PAGES.length}
+              Page {currentPage} of {readerPages.length}
               <span className="hidden sm:inline text-muted-foreground font-normal"> · {progressPct}% of title</span>
             </span>
             <Slider
               min={1}
-              max={MOCK_PAGES.length}
+              max={readerPages.length}
               step={1}
               value={[currentPage]}
               onValueChange={([v]) => goTo(v)}
@@ -2350,7 +2391,7 @@ function ReaderContent() {
           <Button
             variant="ghost"
             size="sm"
-            disabled={currentPage >= MOCK_PAGES.length}
+            disabled={currentPage >= readerPages.length}
             onClick={() => goTo(currentPage + 1)}
             className={cn(
               "gap-1.5",

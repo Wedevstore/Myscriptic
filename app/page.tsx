@@ -18,6 +18,7 @@ import { MOCK_BOOKS } from "@/lib/mock-data"
 import { cmsApi, booksApi, storeApi } from "@/lib/api"
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
 import { apiUrlConfigured } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { cmsSectionStore, seedP4, type CmsSection } from "@/lib/store-p4"
 import type { CmsHomepageSection } from "@/lib/cms-homepage"
 import { shouldTryCmsHomepageApi } from "@/lib/cms-homepage"
@@ -44,7 +45,7 @@ const DEFAULT_HOME_BOOKS: HomeBookSections = {
 }
 
 function mapBookRows(rows: unknown[]): BookCardData[] {
-  return rows.map(r => apiBookToCard(r as ApiBookRecord))
+  return rows.map(r => apiBookToCard(r))
 }
 
 /** Loads curated lists for the static home layout when CMS homepage is unavailable. */
@@ -74,12 +75,16 @@ async function fetchLiveHomeBooks(): Promise<HomeBookSections> {
     .filter(b => b.format === "audiobook")
     .slice(0, 4)
 
+  const mockFb = allowMockCatalogFallback()
   return {
-    trendingBooks: trendingBooks.length ? trendingBooks : DEFAULT_HOME_BOOKS.trendingBooks,
-    newArrivals: newArrivals.length ? newArrivals : DEFAULT_HOME_BOOKS.newArrivals,
-    freeBooks: freeBooks.length ? freeBooks : DEFAULT_HOME_BOOKS.freeBooks,
-    subscriptionBooks: subscriptionBooks.length ? subscriptionBooks : DEFAULT_HOME_BOOKS.subscriptionBooks,
-    audiobooks: audiobooks.length ? audiobooks : DEFAULT_HOME_BOOKS.audiobooks,
+    trendingBooks:
+      trendingBooks.length ? trendingBooks : mockFb ? DEFAULT_HOME_BOOKS.trendingBooks : [],
+    newArrivals:
+      newArrivals.length ? newArrivals : mockFb ? DEFAULT_HOME_BOOKS.newArrivals : [],
+    freeBooks: freeBooks.length ? freeBooks : mockFb ? DEFAULT_HOME_BOOKS.freeBooks : [],
+    subscriptionBooks:
+      subscriptionBooks.length ? subscriptionBooks : mockFb ? DEFAULT_HOME_BOOKS.subscriptionBooks : [],
+    audiobooks: audiobooks.length ? audiobooks : mockFb ? DEFAULT_HOME_BOOKS.audiobooks : [],
   }
 }
 
