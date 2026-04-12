@@ -1081,6 +1081,49 @@ export const authorApi = {
     }),
 }
 
+// ── Reports (User-submitted) ─────────────────────────────────────────────────
+export const reportsApi = {
+  /** Submit a report against a book, content, or author. */
+  create: (body: {
+    target_type: "book" | "content" | "author"
+    target_id: string
+    target_title?: string
+    reason: string
+    description: string
+  }) =>
+    request<{ report_id: string; message: string }>("/reports", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+}
+
+export const adminReportsApi = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : ""
+    return request<{
+      data: {
+        id: string
+        target_type: string
+        target_id: string
+        target_title: string
+        reason: string
+        description: string
+        reporter: { id: string; name: string; email: string }
+        status: string
+        admin_note: string | null
+        created_at: string
+        updated_at: string
+      }[]
+      meta: { current_page: number; last_page: number; total: number }
+    }>(`/admin/reports${qs}`)
+  },
+  updateStatus: (id: string, status: string, adminNote?: string) =>
+    request<{ success: boolean }>(`/admin/reports/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, ...(adminNote ? { admin_note: adminNote } : {}) }),
+    }),
+}
+
 // ── Tax Config (Admin) ─────────────────────────────────────────────────────────
 export const taxApi = {
   list:   () => request<{ data: unknown[] }>("/admin/tax"),

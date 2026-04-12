@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   DollarSign, Upload, BarChart3, Users, Shield,
   BookOpen, Headphones, CheckCircle, ChevronRight,
-  ArrowRight, Star, Zap, Lock,
+  ArrowRight, Star, Zap, Lock, Clock,
 } from "lucide-react"
 import { authorApi } from "@/lib/api"
 import { apiUrlConfigured } from "@/lib/auth-mode"
@@ -138,7 +138,7 @@ const TESTIMONIALS = [
 // ── localStorage-backed application store ────────────────────────────────────
 const APP_KEY = "ms_author_applications"
 
-function saveApplication(data: Record<string, string>) {
+function saveApplication(data: Record<string, unknown>) {
   if (typeof window === "undefined") return
   const existing = JSON.parse(localStorage.getItem(APP_KEY) ?? "[]")
   existing.push({ ...data, id: `app_${Date.now()}`, submittedAt: new Date().toISOString(), status: "pending" })
@@ -153,15 +153,20 @@ function AuthorApplicationForm() {
   const [submitting, setSubmitting] = React.useState(false)
   const [submitted, setSubmitted] = React.useState(false)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
+  const alreadyApplied = user?.authorApplicationStatus === "pending" || user?.authorApplicationStatus === "approved"
+
   const [form, setForm] = React.useState({
     name:          user?.name ?? "",
     email:         user?.email ?? "",
     penName:       "",
     bio:           "",
+    country:       "",
     genres:        "",
     sampleWork:    "",
     experience:    "",
     payoutMethod:  "paystack",
+    payoutCurrency: "USD",
+    agreeTerms:    false,
     // Payout details
     paystackEmail:     "",
     flutterwaveName:   "",
@@ -174,12 +179,16 @@ function AuthorApplicationForm() {
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
+  const submitRef = React.useRef(false)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitRef.current || submitting) return
     if (!isAuthenticated) {
       router.push(`/auth/login?next=${encodeURIComponent("/become-author")}`)
       return
     }
+    submitRef.current = true
     setSubmitError(null)
     setSubmitting(true)
     try {
@@ -187,7 +196,13 @@ function AuthorApplicationForm() {
         await authorApi.apply({
           bio: buildAuthorApplicationBio(form),
           payout_method: form.payoutMethod,
-          payout_details: buildPayoutDetailsFromForm(form),
+          payout_details: {
+            ...buildPayoutDetailsFromForm(form),
+            country: form.country,
+            currency: form.payoutCurrency,
+            pen_name: form.penName || undefined,
+            genres: form.genres,
+          },
         })
       } else {
         await new Promise(r => setTimeout(r, 1400))
@@ -195,6 +210,7 @@ function AuthorApplicationForm() {
       }
       setSubmitted(true)
     } catch (err) {
+      submitRef.current = false
       setSubmitError(err instanceof Error ? err.message : "Could not submit application.")
     } finally {
       setSubmitting(false)
@@ -202,18 +218,65 @@ function AuthorApplicationForm() {
   }
 
   if (submitted) {
+    const isAuthorRole = user?.role === "author"
     return (
       <div className="text-center py-12">
         <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-5">
           <CheckCircle size={32} className="text-green-500" />
         </div>
         <h3 className="font-serif text-2xl font-bold text-foreground mb-2">Application Submitted!</h3>
-        <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-          Our team will review your application and get back to you within 24 hours. Check your email for a confirmation.
+        <p className="text-muted-foreground mb-2 max-w-sm mx-auto">
+          Our editorial team will review your application. You&apos;ll receive an email notification when it&apos;s approved.
         </p>
-        <Link href="/dashboard/author">
+        <div className="inline-flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 rounded-lg px-4 py-2 text-sm font-medium mb-6">
+          <Clock size={14} />
+          Status: Under Review
+        </div>
+        <div className="flex flex-wrap justify-center gap-3">
+          {isAuthorRole ? (
+            <Link href="/dashboard/author">
+              <Button className="bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2">
+                Go to Author Dashboard <ChevronRight size={16} />
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/profile">
+              <Button className="bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2">
+                View Your Profile <ChevronRight size={16} />
+              </Button>
+            </Link>
+          )}
+          <Link href="/authors/guidelines">
+            <Button variant="outline" className="gap-2">
+              Read Author Guidelines
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (alreadyApplied) {
+    const isPending = user?.authorApplicationStatus === "pending"
+    return (
+      <div className="text-center py-12">
+        <div className={cn(
+          "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5",
+          isPending ? "bg-amber-100 dark:bg-amber-900/30" : "bg-green-100 dark:bg-green-900/30"
+        )}>
+          {isPending ? <Clock size={32} className="text-amber-500" /> : <CheckCircle size={32} className="text-green-500" />}
+        </div>
+        <h3 className="font-serif text-2xl font-bold text-foreground mb-2">
+          {isPending ? "Application Under Review" : "You\u2019re an Approved Author!"}
+        </h3>
+        <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+          {isPending
+            ? "We\u2019re reviewing your application. You\u2019ll receive an email when it\u2019s approved."
+            : "Your author account is active. Head to your dashboard to start publishing."}
+        </p>
+        <Link href={isPending ? "/profile" : "/dashboard/author"}>
           <Button className="bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2">
-            Go to Author Dashboard <ChevronRight size={16} />
+            {isPending ? "View Profile" : "Author Dashboard"} <ChevronRight size={16} />
           </Button>
         </Link>
       </div>
@@ -246,7 +309,7 @@ function AuthorApplicationForm() {
                 {step > s ? <CheckCircle size={12} /> : s}
                   {s === 1 ? "Personal Info" : s === 2 ? "Your Work" : "Payout"}
             </button>
-            {s < 2 && <ArrowRight size={14} className="text-muted-foreground" />}
+            {s < 3 && <ArrowRight size={14} className="text-muted-foreground" />}
           </React.Fragment>
         ))}
       </div>
@@ -298,11 +361,21 @@ function AuthorApplicationForm() {
               required
             />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground" htmlFor="apply-country">Country</label>
+            <Input
+              id="apply-country"
+              value={form.country}
+              onChange={e => update("country", e.target.value)}
+              placeholder="e.g. Nigeria, United States, Kenya"
+              required
+            />
+          </div>
           <Button
             type="button"
             className="w-full bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2"
             onClick={() => setStep(2)}
-            disabled={!form.name || !form.email || !form.bio}
+            disabled={!form.name || !form.email || !form.bio || !form.country}
           >
             Continue to Your Work <ChevronRight size={16} />
           </Button>
@@ -469,6 +542,28 @@ function AuthorApplicationForm() {
             </div>
           )}
 
+          {/* Payout currency */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Payout Currency</label>
+            <div className="grid grid-cols-4 gap-2">
+              {["USD", "NGN", "GHS", "KES"].map(cur => (
+                <button
+                  key={cur}
+                  type="button"
+                  onClick={() => update("payoutCurrency", cur)}
+                  className={cn(
+                    "px-3 py-2 rounded-lg border text-sm font-medium transition-all",
+                    form.payoutCurrency === cur
+                      ? "border-brand bg-brand/10 text-brand"
+                      : "border-border text-muted-foreground hover:border-brand/30"
+                  )}
+                >
+                  {cur}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Security note */}
           <div className="flex items-start gap-2.5 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
             <Shield size={14} className="text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
@@ -478,6 +573,24 @@ function AuthorApplicationForm() {
             </p>
           </div>
 
+          {/* Terms acceptance */}
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.agreeTerms}
+              onChange={e => setForm(prev => ({ ...prev, agreeTerms: e.target.checked }))}
+              className="mt-0.5 h-4 w-4 rounded border-border text-brand focus:ring-brand"
+              required
+            />
+            <span className="text-sm text-muted-foreground leading-relaxed">
+              I agree to the{" "}
+              <Link href="/terms" className="text-brand underline underline-offset-2" target="_blank">Terms of Service</Link>
+              {" "}and{" "}
+              <Link href="/authors/guidelines" className="text-brand underline underline-offset-2" target="_blank">Author Guidelines</Link>.
+              I confirm that all submitted content is original work I own the rights to.
+            </span>
+          </label>
+
           <div className="flex gap-3">
             <Button type="button" variant="outline" onClick={() => setStep(2)} className="flex-1">
               Back
@@ -485,7 +598,7 @@ function AuthorApplicationForm() {
             <Button
               type="submit"
               className="flex-1 bg-brand hover:bg-brand-dark text-primary-foreground font-semibold gap-2"
-              disabled={submitting}
+              disabled={submitting || !form.agreeTerms}
             >
               {submitting ? (
                 <><span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" /> Submitting...</>

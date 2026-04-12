@@ -18,7 +18,7 @@ import { authApi, loginWithPassword } from "@/lib/api"
 import { mergeLocalCartToServer } from "@/lib/cart-actions"
 import { laravelAuthEnabled } from "@/lib/auth-mode"
 
-export type UserRole = "admin" | "author" | "user"
+export type UserRole = "admin" | "staff" | "author" | "user"
 
 export interface AuthUser {
   id: string
@@ -26,11 +26,14 @@ export interface AuthUser {
   email: string
   avatar?: string
   role: UserRole
+  permissions?: string[]
   subscriptionPlan?: string | null
   subscriptionExpiresAt?: string | null
   createdAt: string
   /** Client + optional API: authenticator app enrolled (secret stored separately per device). */
   twoFactorEnabled?: boolean
+  /** Author application status (set after applying via /become-author). */
+  authorApplicationStatus?: "pending" | "approved" | "rejected" | null
 }
 
 interface AuthState {
@@ -92,6 +95,7 @@ function getDevMockUsers(): (AuthUser & { password: string })[] {
     `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`
   return [
     { id: "usr_admin_1", name: "Admin User", email: "admin@myscriptic.com", password: "admin123", role: "admin" as const, avatar: pic("core-admin-avatar", 160, 160), createdAt: "2024-01-01T00:00:00Z" },
+    { id: "usr_staff_1", name: "Staff Member", email: "staff@myscriptic.com", password: "staff123", role: "staff" as const, avatar: pic("core-staff-member", 160, 160), createdAt: "2024-01-10T00:00:00Z" },
     { id: "usr_author_1", name: "Jane Austen", email: "author@myscriptic.com", password: "author123", role: "author" as const, avatar: pic("core-author-jane", 160, 160), createdAt: "2024-01-15T00:00:00Z" },
     { id: "usr_reader_1", name: "John Reader", email: "reader@myscriptic.com", password: "reader123", role: "user" as const, subscriptionPlan: "Pro Monthly", subscriptionExpiresAt: "2025-12-31T00:00:00Z", avatar: pic("core-reader-john", 160, 160), createdAt: "2024-02-01T00:00:00Z" },
   ]
@@ -105,12 +109,15 @@ export function normalizeAuthUser(raw: unknown): AuthUser {
   const u = raw as Record<string, unknown>
   const twoFactorEnabled =
     u.two_factor_enabled === true || u.twoFactorEnabled === true ? true : undefined
+  const permissions = Array.isArray(u.permissions) ? u.permissions.map(String) : undefined
+  const appStatus = u.author_application_status ?? u.authorApplicationStatus
   return {
     id: String(u.id),
     name: String(u.name),
     email: String(u.email),
     avatar: u.avatar != null ? String(u.avatar) : undefined,
     role: u.role as UserRole,
+    permissions,
     subscriptionPlan:
       u.subscriptionPlan != null ? (u.subscriptionPlan as string | null) : undefined,
     subscriptionExpiresAt:
@@ -119,6 +126,10 @@ export function normalizeAuthUser(raw: unknown): AuthUser {
         : undefined,
     createdAt: String(u.createdAt),
     twoFactorEnabled,
+    authorApplicationStatus:
+      typeof appStatus === "string" && ["pending", "approved", "rejected"].includes(appStatus)
+        ? (appStatus as "pending" | "approved" | "rejected")
+        : undefined,
   }
 }
 

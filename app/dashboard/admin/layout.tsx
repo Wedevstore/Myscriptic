@@ -13,7 +13,9 @@ import {
   Bell, Tag, FileText, Settings, Shield, ChevronDown, LogOut,
   Menu, X, Newspaper, Image, Globe, Receipt, TrendingUp,
   UserCheck, Zap, Percent, Hash, Lock, ChevronRight, GraduationCap,
+  UsersRound,
 } from "lucide-react"
+import { canAccessRoute, type StaffPermission, NAV_PERMISSION_MAP } from "@/lib/staff-permissions"
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 interface NavItem {
@@ -65,6 +67,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
       { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
       { label: "Contact inbox", href: "/dashboard/admin/contact-messages", icon: FileText },
       { label: "Activity Log",  href: "/dashboard/admin/activity",    icon: TrendingUp },
+      { label: "Staff",         href: "/dashboard/admin/staff",       icon: UsersRound },
       { label: "Settings",      href: "/dashboard/admin/settings",    icon: Settings },
     ],
   },
@@ -102,7 +105,7 @@ function SidebarNav({ onClose }: { onClose?: () => void }) {
         </div>
         <div className="flex flex-col leading-none">
           <span className="text-sidebar-foreground font-serif font-bold text-[15px] tracking-tight">MyScriptic</span>
-          <span className="text-[10px] text-sidebar-foreground/40 font-mono uppercase tracking-widest">Admin</span>
+          <span className="text-[10px] text-sidebar-foreground/40 font-mono uppercase tracking-widest">{user?.role === "staff" ? "Staff" : "Admin"}</span>
         </div>
         <div className="ml-auto">
           <Badge className="bg-brand/20 text-brand border border-brand/30 text-[9px] px-1.5 py-0 font-mono">
@@ -118,42 +121,48 @@ function SidebarNav({ onClose }: { onClose?: () => void }) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
-        {NAV_SECTIONS.map(section => (
-          <div key={section.heading}>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/35 px-2 mb-1">
-              {section.heading}
-            </p>
-            <ul className="space-y-0.5">
-              {section.items.map(item => {
-                const active = isActive(item.href)
-                const showBadge = item.href.includes("authors") && stats.pendingApprovals > 0
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      onClick={onClose}
-                      className={cn(
-                        "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all group relative",
-                        active
-                          ? "bg-brand text-sidebar-primary-foreground shadow-sm"
-                          : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                      )}
-                    >
-                      <item.icon size={15} className={cn(active ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
-                      <span className="flex-1 truncate">{item.label}</span>
-                      {showBadge && (
-                        <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">
-                          {stats.pendingApprovals}
-                        </span>
-                      )}
-                      {active && <ChevronRight size={12} className="opacity-60" />}
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        ))}
+        {NAV_SECTIONS.map(section => {
+          const visibleItems = section.items.filter(item =>
+            canAccessRoute(user?.role ?? "user", user?.id ?? "", item.href)
+          )
+          if (visibleItems.length === 0) return null
+          return (
+            <div key={section.heading}>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/35 px-2 mb-1">
+                {section.heading}
+              </p>
+              <ul className="space-y-0.5">
+                {visibleItems.map(item => {
+                  const active = isActive(item.href)
+                  const showBadge = item.href.includes("authors") && stats.pendingApprovals > 0
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={onClose}
+                        className={cn(
+                          "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all group relative",
+                          active
+                            ? "bg-brand text-sidebar-primary-foreground shadow-sm"
+                            : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                        )}
+                      >
+                        <item.icon size={15} className={cn(active ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {showBadge && (
+                          <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">
+                            {stats.pendingApprovals}
+                          </span>
+                        )}
+                        {active && <ChevronRight size={12} className="opacity-60" />}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )
+        })}
       </nav>
 
       {/* User block */}
@@ -185,11 +194,13 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router  = useRouter()
   const [mobileOpen, setMobileOpen] = React.useState(false)
 
+  const isAdminOrStaff = user?.role === "admin" || user?.role === "staff"
+
   React.useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "admin")) {
+    if (!isLoading && (!isAuthenticated || !isAdminOrStaff)) {
       router.replace("/auth/login?next=%2Fdashboard%2Fadmin")
     }
-  }, [isLoading, isAuthenticated, user, router])
+  }, [isLoading, isAuthenticated, isAdminOrStaff, router])
 
   if (isLoading) {
     return (
@@ -199,7 +210,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!user || user.role !== "admin") return null
+  if (!user || !isAdminOrStaff) return null
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -265,6 +276,7 @@ function Breadcrumb() {
     notifications: "Notifications",
     "contact-messages": "Contact inbox",
     activity: "Activity Log",
+    staff: "Staff",
     settings: "Settings",
   }
 

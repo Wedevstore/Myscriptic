@@ -26,6 +26,7 @@ import {
   Globe, MessageSquare, Award, TrendingUp, GraduationCap, PlayCircle, ArrowRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ReportButton } from "@/components/report-dialog"
 import { CoverImage } from "@/components/ui/cover-image"
 import type { CourseAccessType } from "@/lib/course-access"
 import { formatCourseAccessLabel } from "@/lib/course-access"
@@ -282,13 +283,16 @@ function LiveAuthorProfile({ authorId }: { authorId: string }) {
                 {busyFollow ? "…" : followed ? "Following" : "Follow"}
               </Button>
             </div>
-            <Link
-              href={`/contact?author=${profile.id}`}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-brand transition-colors"
-            >
-              <MessageSquare size={13} />
-              Contact
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href={`/contact?author=${profile.id}`}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-brand transition-colors"
+              >
+                <MessageSquare size={13} />
+                Contact
+              </Link>
+              <ReportButton targetType="author" targetId={profile.id} targetTitle={profile.name} />
+            </div>
           </div>
         </div>
       </div>
@@ -560,6 +564,7 @@ function MockAuthorProfile({ authorId }: { authorId: string }) {
                 <MessageSquare size={13} />
                 Contact
               </Link>
+              <ReportButton targetType="author" targetId={author.id} targetTitle={author.name} />
             </div>
           </div>
         </div>

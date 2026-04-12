@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ProtectedSurface } from "@/components/protected-surface"
+import { ReportButton } from "@/components/report-dialog"
 
 // Mock chapters
 const CHAPTERS = [
@@ -188,7 +189,9 @@ function AudioPlayerContent() {
           </Button>
         </Link>
         <p className="text-sm font-medium text-sidebar-foreground/60 uppercase tracking-wider">Audiobook</p>
-        <div className="w-16" />
+        <div className="w-16 flex justify-end">
+          <ReportButton targetType="book" targetId={book.id} targetTitle={book.title} className="text-sidebar-foreground/50 hover:text-destructive" />
+        </div>
       </header>
 
       <ProtectedSurface

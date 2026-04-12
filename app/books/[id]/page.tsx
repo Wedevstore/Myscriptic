@@ -27,6 +27,7 @@ import {
   type BookDetailApi,
   type RelatedBook,
 } from "@/components/books/book-detail-upgrade"
+import { ReportButton } from "@/components/report-dialog"
 import {
   Star, Heart, Share2, ShoppingCart, BookOpen, Headphones,
   Check, Users, Clock, Globe, BookMarked,
@@ -396,6 +397,7 @@ function BookDetailContent() {
       >
         <Share2 size={18} />
       </button>
+      <ReportButton targetType="book" targetId={book.id} targetTitle={book.title} />
     </div>
   )
 
@@ -442,6 +444,9 @@ function BookDetailContent() {
             </Button>
           </>
         )}
+        <div className="pt-1">
+          <ReportButton targetType="book" targetId={book.id} targetTitle={book.title} />
+        </div>
       </div>
     </div>
   )
