@@ -424,6 +424,7 @@ const SEED_AUTHOR_PAYOUTS: AuthorPayout[] = [
 
 export function seedStore(): void {
   if (typeof window === "undefined") return
+  if (process.env.NODE_ENV === "production") return
   // Phase 2
   if (!localStorage.getItem(KEYS.coupons))       save(KEYS.coupons,       SEED_COUPONS)
   if (!localStorage.getItem(KEYS.taxConfig))     save(KEYS.taxConfig,     SEED_TAX)

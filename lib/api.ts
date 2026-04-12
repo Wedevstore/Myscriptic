@@ -347,6 +347,18 @@ export const contactApi = {
     }),
 }
 
+/** Presign + PUT must match the object Content-Type (EPUB/PDF often missing `File.type`). */
+function inferS3UploadMimeType(file: File): string {
+  const n = file.name.toLowerCase()
+  if (n.endsWith(".epub")) return "application/epub+zip"
+  if (n.endsWith(".pdf")) return "application/pdf"
+  if (n.endsWith(".mp3")) return "audio/mpeg"
+  if (n.endsWith(".m4a")) return "audio/mp4"
+  if (n.endsWith(".wav")) return "audio/wav"
+  if (file.type) return file.type
+  return "application/octet-stream"
+}
+
 // ── Books ─────────────────────────────────────────────────────────────────────
 export const booksApi = {
   list: (params?: Record<string, string>) => {
@@ -409,11 +421,12 @@ export const booksApi = {
    * Returns the S3 key to associate with the book record.
    */
   uploadToS3: async (file: File, onProgress?: (pct: number) => void) => {
-    const { url, key } = await booksApi.getSignedUploadUrl(file.name, file.type || "application/octet-stream")
+    const mime = inferS3UploadMimeType(file)
+    const { url, key } = await booksApi.getSignedUploadUrl(file.name, mime)
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open("PUT", url, true)
-      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream")
+      xhr.setRequestHeader("Content-Type", mime)
       if (onProgress) {
         xhr.upload.addEventListener("progress", e => {
           if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
@@ -884,6 +897,30 @@ export const adminApi = {
     const qs = params ? "?" + new URLSearchParams(params).toString() : ""
     return request<{ data: unknown[]; meta: unknown }>(`/admin/contact-submissions${qs}`)
   },
+
+  // Staff management
+  staffList: () => request<{ data: { id: string; name: string; email: string; avatar?: string; permissions: string[]; active: boolean; created_at: string }[] }>("/admin/staff"),
+  staffCreate: (body: { name: string; email: string; password: string; permissions: string[] }) =>
+    request<{ data: unknown }>("/admin/staff", { method: "POST", body: JSON.stringify(body) }),
+  staffUpdate: (id: string, body: { permissions?: string[]; active?: boolean }) =>
+    request<{ data: unknown }>(`/admin/staff/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  staffDelete: (id: string) =>
+    request<void>(`/admin/staff/${id}`, { method: "DELETE" }),
+
+  // Platform settings
+  settings: () => request<{ data: Record<string, unknown> }>("/admin/settings"),
+  updateSettings: (body: Record<string, unknown>) =>
+    request<{ data: Record<string, unknown> }>("/admin/settings", { method: "PUT", body: JSON.stringify(body) }),
+}
+
+// ── Blog / CMS Posts ──────────────────────────────────────────────────────
+export const blogApi = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : ""
+    return request<{ data: { id: string; title: string; slug: string; excerpt: string; body: string; author: string; category: string; cover_url: string | null; published_at: string; read_time: string }[]; meta: unknown }>(`/blog${qs}`)
+  },
+  get: (idOrSlug: string) =>
+    request<{ data: { id: string; title: string; slug: string; excerpt: string; body: string; author: string; category: string; cover_url: string | null; published_at: string; read_time: string } }>(`/blog/${idOrSlug}`),
 }
 
 // ── Author Earnings ───────────────────────────────────────────────────────────
@@ -1081,6 +1118,9 @@ export const libraryApi = {
    * POST /api/library/:bookId/signed-url
    * Response: { url: string; expires_at: string }
    * Security: URL expires in 15 minutes. Only granted to users with access.
+   *
+   * For **ebooks**, returns a time-limited GET URL for the EPUB/PDF in S3 (`book_file_s3_key`).
+   * The reader fetches bytes from that URL and parses chapters in the browser (IndexedDB cache).
    *
    * For **audiobooks**, the same endpoint should return a time-limited GET URL for the
    * audio object in S3 (e.g. MP3/M4A) keyed by `audio_file_s3_key` — the web player at

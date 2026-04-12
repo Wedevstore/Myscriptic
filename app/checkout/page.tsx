@@ -384,7 +384,7 @@ function CheckoutContent() {
             </div>
           )}
 
-          {/* Step 3: Card details + pay */}
+          {/* Step 3: Confirm + pay */}
           {step === 3 && (
             <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
               <div className="flex items-center gap-3">
@@ -399,63 +399,76 @@ function CheckoutContent() {
 
               <Separator />
 
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="cardName">Name on Card</Label>
-                  <Input
-                    id="cardName"
-                    value={cardName}
-                    onChange={e => setCardName(e.target.value)}
-                    placeholder="John Doe"
-                    className="mt-1.5"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cardNumber">Card Number</Label>
-                  <div className="relative mt-1.5">
-                    <Input
-                      id="cardNumber"
-                      value={cardNumber}
-                      onChange={e => setCardNumber(formatCard(e.target.value))}
-                      placeholder="1234 5678 9012 3456"
-                      maxLength={19}
-                      className="pr-10"
-                    />
-                    <CreditCard size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              {phase2 ? (
+                <div className="text-center py-4 space-y-3">
+                  <div className="flex items-center justify-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                    <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                    <p className="text-sm text-blue-700 dark:text-blue-400">
+                      You&apos;ll be securely redirected to {selectedProvider.label} to complete payment.
+                    </p>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Your card details are entered directly on {selectedProvider.label}&apos;s secure page — never on our servers.
+                  </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+              ) : (
+                <div className="space-y-4">
                   <div>
-                    <Label htmlFor="expiry">Expiry (MM/YY)</Label>
+                    <Label htmlFor="cardName">Name on Card</Label>
                     <Input
-                      id="expiry"
-                      value={cardExpiry}
-                      onChange={e => setCardExpiry(formatExpiry(e.target.value))}
-                      placeholder="MM/YY"
-                      maxLength={5}
+                      id="cardName"
+                      value={cardName}
+                      onChange={e => setCardName(e.target.value)}
+                      placeholder="John Doe"
                       className="mt-1.5"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="cvv">CVV</Label>
-                    <Input
-                      id="cvv"
-                      value={cardCvv}
-                      onChange={e => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                      placeholder="123"
-                      maxLength={4}
-                      className="mt-1.5"
-                    />
+                    <Label htmlFor="cardNumber">Card Number</Label>
+                    <div className="relative mt-1.5">
+                      <Input
+                        id="cardNumber"
+                        value={cardNumber}
+                        onChange={e => setCardNumber(formatCard(e.target.value))}
+                        placeholder="1234 5678 9012 3456"
+                        maxLength={19}
+                        className="pr-10"
+                      />
+                      <CreditCard size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="expiry">Expiry (MM/YY)</Label>
+                      <Input
+                        id="expiry"
+                        value={cardExpiry}
+                        onChange={e => setCardExpiry(formatExpiry(e.target.value))}
+                        placeholder="MM/YY"
+                        maxLength={5}
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cvv">CVV</Label>
+                      <Input
+                        id="cvv"
+                        value={cardCvv}
+                        onChange={e => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        placeholder="123"
+                        maxLength={4}
+                        className="mt-1.5"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                    <ShieldCheck size={14} className="text-green-600 dark:text-green-400 shrink-0" />
+                    <p className="text-xs text-green-700 dark:text-green-400">
+                      256-bit SSL encryption. Your payment info is never stored on our servers.
+                    </p>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <ShieldCheck size={14} className="text-green-600 dark:text-green-400 shrink-0" />
-                <p className="text-xs text-green-700 dark:text-green-400">
-                  256-bit SSL encryption. Your payment info is never stored on our servers.
-                </p>
-              </div>
+              )}
 
               {payError && (
                 <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mb-1">
@@ -470,6 +483,8 @@ function CheckoutContent() {
               >
                 {processing ? (
                   <><Loader2 size={16} className="animate-spin" /> Processing payment...</>
+                ) : phase2 ? (
+                  <>Continue to {selectedProvider.label} — {CURRENCY_SYMBOLS[currency]}{totalLocal.toFixed(2)}</>
                 ) : (
                   <>Pay {CURRENCY_SYMBOLS[currency]}{totalLocal.toFixed(2)} via {selectedProvider.label}</>
                 )}

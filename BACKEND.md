@@ -6,7 +6,7 @@
 >
 > GitHub Issues labeled [`backend`](https://github.com/Wedevstore/Myscriptic/issues?q=label:backend) mirror sections below.
 
-**Last synced:** 2026-04-12
+**Last synced:** 2026-04-12 (production hardening update)
 
 ---
 
@@ -86,6 +86,52 @@ ALTER TABLE users
 ```
 
 Permission keys: `dashboard_view`, `users_manage`, `books_manage`, `orders_manage`, `subscriptions_manage`, `revenue_view`, `analytics_view`, `reports_manage`, `staff_manage`, `settings_manage`, `cms_manage`, `notifications_manage`, `authors_manage`, `courses_manage`
+
+### 1.6 Platform settings table (NEW)
+
+```sql
+CREATE TABLE platform_settings (
+    `key` VARCHAR(100) PRIMARY KEY,
+    `value` TEXT NULL,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Seed default settings:
+INSERT INTO platform_settings (`key`, `value`) VALUES
+  ('platformName', 'MyScriptic'),
+  ('supportEmail', 'support@myscriptic.com'),
+  ('authorRevenueShare', '70'),
+  ('autoApproveAuthors', 'false'),
+  ('maxBooksPerAuthor', '50'),
+  ('trialDays', '7'),
+  ('emailOnNewBook', 'true'),
+  ('emailOnSubscription', 'true'),
+  ('emailOnPayout', 'true'),
+  ('maintenanceMode', 'false');
+```
+
+### 1.7 Blog posts table (NEW)
+
+```sql
+CREATE TABLE blog_posts (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(500) NOT NULL,
+    slug VARCHAR(500) NOT NULL UNIQUE,
+    excerpt TEXT NULL,
+    body LONGTEXT NOT NULL,
+    author VARCHAR(200) NOT NULL DEFAULT 'MyScriptic Team',
+    category VARCHAR(100) NOT NULL DEFAULT 'Company',
+    cover_url VARCHAR(1000) NULL,
+    published_at TIMESTAMP NULL,
+    read_time VARCHAR(50) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_blog_posts_slug (slug),
+    INDEX idx_blog_posts_category (category),
+    INDEX idx_blog_posts_published (published_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
 
 ### 1.5 Author applications — [Issue #17](https://github.com/Wedevstore/Myscriptic/issues/17)
 
@@ -323,6 +369,33 @@ When `append=false` (default): delete existing chapters first, then insert. When
 | Audit | `GET /admin/audit-logs` |
 | Courses | `GET /admin/author-courses` |
 
+### Staff Management (NEW)
+
+| Method | Path | Auth | Request | Response |
+|--------|------|------|---------|----------|
+| GET | `/admin/staff` | Admin | — | `{ data: StaffMember[] }` |
+| POST | `/admin/staff` | Admin | `{ name, email, password, permissions: string[] }` | `{ data: StaffMember }` |
+| PATCH | `/admin/staff/:id` | Admin | `{ permissions?, active? }` | `{ data: StaffMember }` |
+| DELETE | `/admin/staff/:id` | Admin | — | void |
+
+StaffMember: `{ id, name, email, avatar?, permissions: string[], active: boolean, created_at }`
+
+### Platform Settings (NEW)
+
+| Method | Path | Auth | Request | Response |
+|--------|------|------|---------|----------|
+| GET | `/admin/settings` | Admin | — | `{ data: PlatformSettings }` |
+| PUT | `/admin/settings` | Admin | `{ platformName, supportEmail, authorRevenueShare, autoApproveAuthors, maxBooksPerAuthor, trialDays, emailOnNewBook, emailOnSubscription, emailOnPayout, maintenanceMode }` | `{ data: PlatformSettings }` |
+
+### Blog Posts (NEW)
+
+| Method | Path | Auth | Request | Response |
+|--------|------|------|---------|----------|
+| GET | `/blog` | No | `?category=&page=` | `{ data: BlogPost[], meta }` |
+| GET | `/blog/:idOrSlug` | No | — | `{ data: BlogPost }` |
+
+BlogPost: `{ id, title, slug, excerpt, body, author, category, cover_url, published_at, read_time }`
+
 ### Public / Misc
 
 | Method | Path | Notes |
@@ -391,9 +464,12 @@ Frontend accepts both `snake_case` and `camelCase` for all fields.
 2. Frontend PUTs file directly to S3
 3. Frontend sends S3 key in book create/patch payload
 
-### Download flow
-1. Frontend calls `POST /api/library/:id/signed-url` → gets presigned GET URL
-2. Frontend fetches file from S3, parses chapters client-side, caches in IndexedDB
+### Download flow (ebooks: EPUB/PDF)
+1. Frontend calls `POST /api/library/:id/signed-url` → presigned GET URL for the object behind `book_file_s3_key`
+2. Browser **GET**s the file directly from S3 (CORS required), parses chapters client-side, caches in IndexedDB
+3. Optional fallback: `GET /api/books/:id/chapters` when signed URL or S3 fetch fails (legacy / server cache)
+
+Author uploads use the same upload flow for EPUB and PDF (`book_file_s3_key`); presign should allow `application/epub+zip` and `application/pdf`.
 
 ---
 
@@ -401,6 +477,7 @@ Frontend accepts both `snake_case` and `camelCase` for all fields.
 
 | Date | Change | Frontend Files | Backend Impact |
 |------|--------|----------------|----------------|
+| 2026-04-12 | Ebook reader: S3-first, EPUB MIME on upload | `lib/api.ts`, `app/reader/[id]/page.tsx` | Ensure `POST /library/:id/signed-url` serves `book_file_s3_key`; presign upload accepts `application/epub+zip` |
 | 2026-04-12 | Book chapters: parse, store, fetch | `lib/book-parser.ts`, `lib/api.ts`, `app/reader/[id]/page.tsx` | NEW: `book_chapters` table, `POST/GET /books/:id/chapters` |
 | 2026-04-12 | S3 direct upload + signed download | `lib/api.ts`, `app/dashboard/author/books/new/page.tsx` | NEW: `POST /upload/signed-url`, `POST /library/:id/signed-url` |
 | 2026-04-12 | Book metadata fields | `lib/book-mapper.ts`, `app/books/[id]/page.tsx` | NEW columns: `chapter_count`, `file_format`, `file_size_bytes`, S3 keys |
@@ -412,3 +489,12 @@ Frontend accepts both `snake_case` and `camelCase` for all fields.
 | 2026-04-12 | Author/admin preview | `app/reader/[id]/page.tsx` | No backend change (access bypass is frontend-only) |
 | 2026-04-12 | IndexedDB chapter cache | `lib/chapter-store.ts` | No backend change (client-side only) |
 | 2026-04-12 | PDF Web Worker | `lib/book-parser-worker.ts` | No backend change (client-side only) |
+| 2026-04-12 | Staff management API | `lib/staff-permissions.ts`, `lib/api.ts` | NEW: `GET/POST/PATCH/DELETE /admin/staff` — create staff with role + permissions |
+| 2026-04-12 | Platform settings API | `app/dashboard/admin/settings/page.tsx`, `lib/api.ts` | NEW: `GET/PUT /admin/settings` — persist platform config to DB |
+| 2026-04-12 | Blog posts API | `app/blog/page.tsx`, `lib/api.ts` | NEW: `GET /blog`, `GET /blog/:idOrSlug` — CMS-managed blog posts |
+| 2026-04-12 | Book reviews wired to API | `app/books/[id]/page.tsx` | Ensure `GET /books/:id/reviews` returns reviews for the book |
+| 2026-04-12 | Reports always use API in prod | `components/report-dialog.tsx` | No new endpoint — existing `POST /reports` now always called in production |
+| 2026-04-12 | Middleware auth protection | `middleware.ts` | No backend change — server-side route guarding via auth cookie |
+| 2026-04-12 | Seed functions disabled in prod | `lib/store.ts`, `lib/store-p4.ts`, `lib/author-courses-store.ts` | No backend change — mock data no longer seeded in production |
+| 2026-04-12 | CSP tightened | `next.config.js` | No backend change — removed `unsafe-eval` from Content-Security-Policy |
+| 2026-04-12 | Error reporting facade | `lib/error-reporting.ts`, `app/error.tsx`, `app/global-error.tsx` | No backend change — structured error logging for Vercel log drain |

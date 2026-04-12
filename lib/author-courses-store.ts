@@ -208,6 +208,8 @@ export const authorCourseStore = {
 
 /** Idempotent demo data */
 export function seedAuthorCourses() {
+  if (typeof window === "undefined") return
+  if (process.env.NODE_ENV === "production") return
   if (authorCourseStore.getAll().length > 0) return
   authorCourseStore.create({
     authorId: "usr_author_1",

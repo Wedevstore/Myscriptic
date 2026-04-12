@@ -10,7 +10,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MOCK_BOOKS } from "@/lib/mock-data"
-import { booksApi, wishlistApi } from "@/lib/api"
+import { booksApi, wishlistApi, reviewsApi } from "@/lib/api"
 import { syncWishlistWithServer } from "@/lib/wishlist-sync"
 import { apiBookToCard, normalizeApiBookRecord, type ApiBookRecord } from "@/lib/book-mapper"
 import { resolveBookSampleExcerpt } from "@/lib/book-sample-excerpts"
@@ -176,6 +176,35 @@ function BookDetailContent() {
   const [shareHint, setShareHint] = React.useState(false)
   const [related, setRelated] = React.useState<BookCardData[]>([])
   const [reviewsVisible, setReviewsVisible] = React.useState(INITIAL_REVIEW_VISIBLE)
+  type ReviewItem = { id: string; user: string; avatar: string; rating: number; date: string; comment: string }
+  const [liveReviews, setLiveReviews] = React.useState<ReviewItem[]>([])
+  const [reviewsFetched, setReviewsFetched] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!bookId || !liveBooks) return
+    let cancelled = false
+    reviewsApi
+      .list(bookId)
+      .then(res => {
+        if (cancelled) return
+        const rows = Array.isArray(res?.data) ? res.data : []
+        const mapped: ReviewItem[] = rows.map((r: unknown) => {
+          const row = r as Record<string, unknown>
+          return {
+            id: String(row.id ?? row.review_id ?? Math.random()),
+            user: String(row.user_name ?? row.author_name ?? row.userName ?? "Reader"),
+            avatar: String(row.user_name ?? row.author_name ?? "R").slice(0, 2).toUpperCase(),
+            rating: Number(row.rating ?? 5),
+            date: row.created_at ? new Date(String(row.created_at)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
+            comment: String(row.comment ?? row.body ?? ""),
+          }
+        })
+        setLiveReviews(mapped)
+        setReviewsFetched(true)
+      })
+      .catch(() => setReviewsFetched(true))
+    return () => { cancelled = true }
+  }, [bookId, liveBooks])
 
   React.useEffect(() => {
     const fb = MOCK_BOOKS.filter(b => b.category === book.category && b.id !== book.id).slice(0, 6)
@@ -305,8 +334,9 @@ function BookDetailContent() {
     }
   }
 
+  const activeReviews: ReviewItem[] = reviewsFetched && liveReviews.length > 0 ? liveReviews : MOCK_REVIEWS.map(r => ({ id: r.id, user: r.user, avatar: r.avatar, rating: r.rating, date: r.date, comment: r.comment }))
   const loadMoreReviews = () => {
-    setReviewsVisible(n => Math.min(n + 3, MOCK_REVIEWS.length))
+    setReviewsVisible(n => Math.min(n + 3, activeReviews.length))
   }
 
   const handleReadNow = () => {
@@ -456,7 +486,7 @@ function BookDetailContent() {
     </div>
   )
 
-  const patchReviews = MOCK_REVIEWS.slice(0, reviewsVisible).map(r => ({
+  const patchReviews = activeReviews.slice(0, reviewsVisible).map(r => ({
     id: r.id,
     authorName: r.user,
     authorInitials: r.avatar,
@@ -526,7 +556,7 @@ function BookDetailContent() {
               reviewCount={book.reviewCount}
               distribution={ratingBreakdown}
               reviews={patchReviews}
-              onLoadMore={reviewsVisible < MOCK_REVIEWS.length ? loadMoreReviews : undefined}
+              onLoadMore={reviewsVisible < activeReviews.length ? loadMoreReviews : undefined}
             />
           </div>
         )}

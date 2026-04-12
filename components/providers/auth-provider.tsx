@@ -77,12 +77,22 @@ function loadFromStorage(): { user: AuthUser | null; token: string | null } {
   }
 }
 
+function syncAuthCookie(token: string | null) {
+  if (typeof document === "undefined") return
+  if (token) {
+    document.cookie = `myscriptic_auth=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
+  } else {
+    document.cookie = "myscriptic_auth=; path=/; max-age=0; SameSite=Lax"
+  }
+}
+
 function saveToStorage(user: AuthUser | null, token: string | null) {
   if (!user) {
     localStorage.removeItem(STORAGE_KEY)
   } else {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ user, token }))
   }
+  syncAuthCookie(token)
 }
 
 /**

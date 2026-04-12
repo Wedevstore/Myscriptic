@@ -6,6 +6,8 @@
  * With Laravel Phase 3 (`NEXT_PUBLIC_API_URL` + optional flags): numeric `/reader/:id`
  * uses `GET /api/library/:id/access`, `GET /api/books/:id` for metadata, debounced
  * `POST /api/reading-progress` and `GET /api/reading-progress/:id` for sync/restore.
+ * Ebook body: after local cache, `POST /api/library/:id/signed-url` then browser fetch of the
+ * EPUB/PDF from S3; `GET /api/books/:id/chapters` is only a fallback when S3 is unavailable.
  * Offline/mock routes use `engagementStore` + `MOCK_BOOKS` only.
  */
 
@@ -535,33 +537,25 @@ function ReaderContent() {
         return
       }
 
-      if (alive) { setContentLoading(true); setContentProgress("Loading chapters…") }
+      if (alive) { setContentLoading(true); setContentProgress("Loading book…") }
 
-      // 2. Try API chapters
-      try {
-        const chaptersRes = await booksApi.getChapters(routeId)
-        if (!alive) return
-        if (chaptersRes.data && chaptersRes.data.length > 0) {
-          const looksLikeHtml = /<[a-z][\s\S]*>/i.test(chaptersRes.data[0]?.content ?? "")
-          const rebuilt: ParsedBook = {
-            format: "epub", title: null, author: null,
-            chapters: chaptersRes.data,
-            totalCharacters: chaptersRes.data.reduce((s, c) => s + c.content.length, 0),
-            parsedAt: new Date().toISOString(),
-            contentType: looksLikeHtml ? "html" : "text",
-          }
-          try {
-            const { idbSaveParsedBook } = await import("@/lib/chapter-store")
-            await idbSaveParsedBook(engagementBookId, rebuilt)
-          } catch { saveParsedBook(engagementBookId, rebuilt) }
-          if (alive) applyParsed(rebuilt)
-          return
+      const applyFromChapters = async (rows: { index: number; title: string; content: string }[]) => {
+        const looksLikeHtml = /<[a-z][\s\S]*>/i.test(rows[0]?.content ?? "")
+        const rebuilt: ParsedBook = {
+          format: "epub", title: null, author: null,
+          chapters: rows,
+          totalCharacters: rows.reduce((s, c) => s + c.content.length, 0),
+          parsedAt: new Date().toISOString(),
+          contentType: looksLikeHtml ? "html" : "text",
         }
-      } catch { /* API chapters not available — try S3 */ }
+        try {
+          const { idbSaveParsedBook } = await import("@/lib/chapter-store")
+          await idbSaveParsedBook(engagementBookId, rebuilt)
+        } catch { saveParsedBook(engagementBookId, rebuilt) }
+        if (alive) applyParsed(rebuilt)
+      }
 
-      if (!alive) return
-
-      // 3. Fetch from S3
+      // 2. Direct S3 (author EPUB/PDF is stored in S3; reader downloads via signed GET)
       try {
         setContentProgress("Fetching book file…")
         const { url } = await libraryApi.getSignedUrl(routeId)
@@ -572,14 +566,28 @@ function ReaderContent() {
         try {
           await booksApi.saveChapters(routeId, parsed.chapters.map((ch, i) => ({ index: i, title: ch.title, content: ch.content })))
         } catch { /* best-effort server cache */ }
-      } catch (err) {
+        return
+      } catch { /* signed URL / S3 fetch failed — try API chapters */ }
+
+      if (!alive) return
+
+      // 3. Fallback: server-stored chapters
+      try {
+        setContentProgress("Loading chapters…")
+        const chaptersRes = await booksApi.getChapters(routeId)
         if (!alive) return
-        setContentLoading(false)
-        setContentProgress(null)
-        setContentError(err instanceof Error ? err.message : "Could not load book content.")
-        setReaderPages(MOCK_PAGES)
-        setHasParsedContent(false)
-      }
+        if (chaptersRes.data && chaptersRes.data.length > 0) {
+          await applyFromChapters(chaptersRes.data)
+          return
+        }
+      } catch { /* no chapters */ }
+
+      if (!alive) return
+      setContentLoading(false)
+      setContentProgress(null)
+      setContentError("Could not load book content.")
+      setReaderPages(MOCK_PAGES)
+      setHasParsedContent(false)
     }
 
     loadChapters()
@@ -1315,20 +1323,50 @@ function ReaderContent() {
               setContentError(null)
               setContentLoading(true)
               setContentProgress("Retrying…")
-              const isLive = laravelPhase3Enabled() && /^\d+$/.test(routeId)
-              if (isLive) {
-                libraryApi.getSignedUrl(routeId)
-                  .then(({ url }) => fetchAndParseBook(engagementBookId, url, setContentProgress))
-                  .then(applyParsed)
-                  .catch(err => {
-                    setContentLoading(false)
-                    setContentProgress(null)
-                    setContentError(err instanceof Error ? err.message : "Retry failed.")
-                  })
-              } else {
+              const isLiveEbook =
+                laravelPhase3Enabled() && /^\d+$/.test(routeId) && book.format !== "audiobook"
+              if (!isLiveEbook) {
                 setContentLoading(false)
                 setContentProgress(null)
+                return
               }
+              void (async () => {
+                try {
+                  const { url } = await libraryApi.getSignedUrl(routeId)
+                  const parsed = await fetchAndParseBook(engagementBookId, url, setContentProgress)
+                  applyParsed(parsed)
+                  try {
+                    await booksApi.saveChapters(
+                      routeId,
+                      parsed.chapters.map((ch, i) => ({ index: i, title: ch.title, content: ch.content }))
+                    )
+                  } catch { /* best-effort */ }
+                } catch {
+                  try {
+                    const chaptersRes = await booksApi.getChapters(routeId)
+                    if (chaptersRes.data && chaptersRes.data.length > 0) {
+                      const rows = chaptersRes.data
+                      const looksLikeHtml = /<[a-z][\s\S]*>/i.test(rows[0]?.content ?? "")
+                      const rebuilt: ParsedBook = {
+                        format: "epub", title: null, author: null,
+                        chapters: rows,
+                        totalCharacters: rows.reduce((s, c) => s + c.content.length, 0),
+                        parsedAt: new Date().toISOString(),
+                        contentType: looksLikeHtml ? "html" : "text",
+                      }
+                      try {
+                        const { idbSaveParsedBook } = await import("@/lib/chapter-store")
+                        await idbSaveParsedBook(engagementBookId, rebuilt)
+                      } catch { saveParsedBook(engagementBookId, rebuilt) }
+                      applyParsed(rebuilt)
+                      return
+                    }
+                  } catch { /* noop */ }
+                  setContentLoading(false)
+                  setContentProgress(null)
+                  setContentError("Retry failed.")
+                }
+              })()
             }}
             className={cn(
               "px-3 py-1 rounded-lg text-xs font-semibold transition-colors",

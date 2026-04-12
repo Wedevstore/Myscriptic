@@ -377,6 +377,8 @@ export function getPlatformStats(): PlatformStats {
 // SEED (idempotent — only seeds if localStorage keys are empty)
 // ─────────────────────────────────────────────────────────────────────────────
 export function seedP4() {
+  if (typeof window === "undefined") return
+  if (process.env.NODE_ENV === "production") return
   // CMS sections
   if (cmsSectionStore.getAll().length === 0) {
     const sections: Omit<CmsSection,"id"|"createdAt"|"updatedAt">[] = [

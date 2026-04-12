@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next"
 import { serverFetchJson, siteUrl } from "@/lib/server-api"
-import { MOCK_BOOKS } from "@/lib/mock-data"
 
 type BooksPage = {
   data: { id: string | number }[]
@@ -61,15 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     page++
   } while (page <= lastPage)
 
-  if (!anyApiBooks) {
-    for (const b of MOCK_BOOKS) {
-      entries.push({
-        url: `${base}/books/${encodeURIComponent(b.id)}`,
-        changeFrequency: "weekly",
-        priority: 0.8,
-      })
-    }
-  }
+  // No mock fallback — sitemap only contains real content from the API
 
   const coursesJson = await serverFetchJson<CoursesList>("/courses", 3600)
   if (coursesJson?.data?.length) {

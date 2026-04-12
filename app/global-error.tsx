@@ -1,5 +1,8 @@
 "use client"
 
+import { useEffect } from "react"
+import { captureException } from "@/lib/error-reporting"
+
 /**
  * app/global-error.tsx — Root-level error boundary.
  * Catches errors that break the root layout itself.
@@ -12,6 +15,10 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    captureException(error, { tags: { boundary: "global-error" }, extra: { digest: error.digest } })
+  }, [error])
+
   return (
     <html lang="en">
       <body style={{ margin: 0, fontFamily: "system-ui, sans-serif", background: "#fafafa", color: "#111" }}>

@@ -9,7 +9,7 @@ import {
   DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { reportsApi } from "@/lib/api"
-import { apiUrlConfigured } from "@/lib/auth-mode"
+import { apiUrlConfigured, isProductionRuntime } from "@/lib/auth-mode"
 import { cn } from "@/lib/utils"
 import {
   Flag, AlertTriangle, ShieldAlert, Ban, Copyright,
@@ -114,7 +114,7 @@ export function ReportDialog({ open, onOpenChange, targetType, targetId, targetT
     setSubmitting(true)
     setError(null)
     try {
-      if (apiUrlConfigured()) {
+      if (apiUrlConfigured() || isProductionRuntime()) {
         await reportsApi.create({
           target_type: targetType,
           target_id: targetId,

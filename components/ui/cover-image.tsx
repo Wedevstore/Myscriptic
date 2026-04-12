@@ -12,10 +12,23 @@ type CoverImageProps = {
   sizes?: string
 }
 
-/**
- * Fills a `relative` positioned parent. Uses `unoptimized` so arbitrary cover URLs
- * (API/CDN) work without expanding `next.config` `remotePatterns` for every host.
- */
+const OPTIMIZABLE_HOSTS = [
+  "amazonaws.com",
+  "cloudfront.net",
+  "placehold.co",
+  "picsum.photos",
+  "fastly.picsum.photos",
+]
+
+function canOptimize(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname
+    return OPTIMIZABLE_HOSTS.some(h => hostname === h || hostname.endsWith(`.${h}`))
+  } catch {
+    return url.startsWith("/")
+  }
+}
+
 export function CoverImage({ src, alt, className, priority, sizes }: CoverImageProps) {
   return (
     <Image
@@ -24,7 +37,7 @@ export function CoverImage({ src, alt, className, priority, sizes }: CoverImageP
       fill
       sizes={sizes ?? "(max-width: 768px) 50vw, 320px"}
       className={cn("object-cover", className)}
-      unoptimized
+      unoptimized={!canOptimize(src)}
       priority={priority}
     />
   )

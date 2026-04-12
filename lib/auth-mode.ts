@@ -6,6 +6,15 @@ function envFalsey(v: string | undefined): boolean {
   return v === "false" || v === "0"
 }
 
+/** True in vercel/production — mock paths should be blocked. */
+export function isProductionRuntime(): boolean {
+  return (
+    process.env.NODE_ENV === "production" &&
+    (process.env.VERCEL === "1" || process.env.NEXT_PUBLIC_VERCEL === "1" ||
+     Boolean(process.env.NEXT_PUBLIC_API_URL?.trim()))
+  )
+}
+
 /** True when `NEXT_PUBLIC_API_URL` is set (API origin, e.g. `https://api.myscriptic.com` — `/api` is appended in `lib/api.ts`). */
 export function apiUrlConfigured(): boolean {
   const u = process.env.NEXT_PUBLIC_API_URL?.trim()

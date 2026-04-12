@@ -96,11 +96,42 @@ const CATEGORY_COLOR: Record<string, string> = {
   "Company":         "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
 }
 
+type BlogPost = typeof POSTS[number]
+
 function BlogContent() {
   const [query, setQuery] = React.useState("")
   const [activeCategory, setActiveCategory] = React.useState("All")
   const [nlEmail, setNlEmail] = React.useState("")
   const [nlDone, setNlDone] = React.useState(false)
+  const [livePosts, setLivePosts] = React.useState<BlogPost[]>([])
+  const [apiFetched, setApiFetched] = React.useState(false)
+
+  React.useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
+    if (!apiUrl) { setApiFetched(true); return }
+    import("@/lib/api").then(({ blogApi }) => {
+      blogApi.list()
+        .then(res => {
+          const rows = Array.isArray(res?.data) ? res.data : []
+          if (rows.length) {
+            setLivePosts(rows.map(r => ({
+              id: String(r.id ?? r.slug),
+              category: r.category ?? "Company",
+              title: r.title,
+              excerpt: r.excerpt ?? "",
+              author: r.author ?? "MyScriptic Team",
+              authorInitials: (r.author ?? "MT").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+              date: r.published_at ? new Date(r.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
+              readTime: r.read_time ?? "3 min read",
+              featured: false,
+              coverUrl: r.cover_url ?? `https://placehold.co/480x300?text=${encodeURIComponent(r.title.slice(0, 30))}`,
+            })))
+          }
+        })
+        .catch(() => {})
+        .finally(() => setApiFetched(true))
+    })
+  }, [])
 
   const handleNewsletterSubscribe = async () => {
     if (!nlEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nlEmail)) return
@@ -117,9 +148,10 @@ function BlogContent() {
     setNlDone(true)
   }
 
-  const featured = POSTS.find(p => p.featured)
-  const filtered = POSTS.filter(p => {
-    if (p.featured) return false
+  const posts = livePosts.length > 0 ? livePosts : (apiFetched ? POSTS : POSTS)
+  const featured = posts.find(p => p.featured) ?? (posts.length > 0 ? posts[0] : undefined)
+  const filtered = posts.filter(p => {
+    if (featured && p.id === featured.id) return false
     const matchesQuery = !query || p.title.toLowerCase().includes(query.toLowerCase()) || p.excerpt.toLowerCase().includes(query.toLowerCase())
     const matchesCat = activeCategory === "All" || p.category === activeCategory
     return matchesQuery && matchesCat

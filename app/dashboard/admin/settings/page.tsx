@@ -106,7 +106,28 @@ export default function AdminSettingsPage() {
     feature_flags_json: "{}",
   })
 
-  React.useEffect(() => { seedP4(); setSettings(loadSettings()); setLoading(false) }, [])
+  React.useEffect(() => {
+    seedP4()
+    if (live) {
+      adminApi.settings()
+        .then(r => {
+          const d = r?.data
+          if (d && typeof d === "object") {
+            setSettings(prev => ({
+              ...prev,
+              ...Object.fromEntries(
+                Object.entries(d).filter(([, v]) => v !== null && v !== undefined)
+              ),
+            } as PlatformSettings))
+          }
+        })
+        .catch(() => { /* fall back to local */ })
+        .finally(() => setLoading(false))
+    } else {
+      setSettings(loadSettings())
+      setLoading(false)
+    }
+  }, [live])
 
   React.useEffect(() => {
     if (!live) {
@@ -172,9 +193,12 @@ export default function AdminSettingsPage() {
     saveSettings(settings)
     if (live) {
       try {
-        await adminApi.updateSubscriptionPoolSettings(100 - settings.authorRevenueShare)
+        await Promise.all([
+          adminApi.updateSubscriptionPoolSettings(100 - settings.authorRevenueShare),
+          adminApi.updateSettings(settings as unknown as Record<string, unknown>),
+        ])
       } catch (e) {
-        setSaveErr(e instanceof Error ? e.message : "Could not save subscription pool settings.")
+        setSaveErr(e instanceof Error ? e.message : "Could not save settings.")
         return
       }
     }

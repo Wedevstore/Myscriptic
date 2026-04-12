@@ -99,6 +99,25 @@ export function saveStaffMembers(members: StaffMember[]) {
   localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(members))
 }
 
+export async function loadStaffMembersFromApi(): Promise<StaffMember[] | null> {
+  try {
+    const { adminApi } = await import("@/lib/api")
+    const res = await adminApi.staffList()
+    const rows = Array.isArray(res?.data) ? res.data : []
+    return rows.map(r => ({
+      id: String(r.id),
+      name: String(r.name),
+      email: String(r.email),
+      avatar: r.avatar ?? undefined,
+      permissions: (r.permissions ?? []) as StaffPermission[],
+      active: r.active !== false,
+      createdAt: r.created_at ?? new Date().toISOString(),
+    }))
+  } catch {
+    return null
+  }
+}
+
 export function getStaffPermissions(userId: string): StaffPermission[] {
   const members = loadStaffMembers()
   const member = members.find(m => m.id === userId && m.active)

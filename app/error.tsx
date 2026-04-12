@@ -8,6 +8,7 @@ import { useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, Home, RefreshCw } from "lucide-react"
+import { captureException } from "@/lib/error-reporting"
 
 interface ErrorPageProps {
   error: Error & { digest?: string }
@@ -16,8 +17,7 @@ interface ErrorPageProps {
 
 export default function Error({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    // TODO: wire Sentry or similar error reporting here
-    // e.g. Sentry.captureException(error)
+    captureException(error, { tags: { boundary: "app-error" }, extra: { digest: error.digest } })
   }, [error])
 
   return (

@@ -61,25 +61,25 @@ const TEAM = [
     name: "Adaeze Okonkwo",
     role: "Chief Executive Officer",
     bio: "Former product lead at a leading African fintech. Passionate about democratising access to knowledge.",
-    avatar: "https://placehold.co/120x120?text=AO+CEO+professional+headshot+female+leader+warm+background",
+    initials: "AO",
   },
   {
     name: "Seun Falana",
     role: "Chief Technology Officer",
     bio: "Full-stack architect with 14 years building scalable platforms. Open-source contributor.",
-    avatar: "https://placehold.co/120x120?text=SF+CTO+professional+headshot+male+tech+leader+neutral+background",
+    initials: "SF",
   },
   {
     name: "Kwame Asante",
     role: "Head of Author Relations",
     bio: "Published author himself, Kwame ensures every creator feels supported and fairly compensated.",
-    avatar: "https://placehold.co/120x120?text=KA+Author+Relations+professional+headshot+male+creative+background",
+    initials: "KA",
   },
   {
     name: "Fatima Al-Rashid",
     role: "Head of Product Design",
     bio: "10 years designing consumer products for global audiences. Led design at two successful startups.",
-    avatar: "https://placehold.co/120x120?text=FR+Design+Lead+professional+headshot+female+creative+warm",
+    initials: "FR",
   },
 ]
 
@@ -150,12 +150,11 @@ export default function AboutPage() {
                     Every feature we build — from the revenue pool engine to the immersive reader — exists in service of that mission.
                   </p>
                 </div>
-                <div className="rounded-2xl overflow-hidden shadow-xl aspect-[4/3]">
-                  <img
-                    src="https://placehold.co/600x450?text=Diverse+team+collaborating+modern+office+books+technology+warm+lighting"
-                    alt="MyScriptic team collaborating"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="rounded-2xl overflow-hidden shadow-xl aspect-[4/3] bg-gradient-to-br from-brand/20 via-brand/10 to-background flex items-center justify-center">
+                  <div className="text-center px-6">
+                    <div className="w-16 h-16 rounded-xl bg-brand text-primary-foreground flex items-center justify-center font-serif font-bold text-2xl mx-auto mb-3">M</div>
+                    <p className="text-lg font-serif font-bold text-foreground">Building the future of African literature</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -224,11 +223,12 @@ export default function AboutPage() {
               <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6">
                 {TEAM.map(member => (
                   <div key={member.name} className="bg-card border border-border rounded-xl p-5 text-center">
-                    <img
-                      src={member.avatar}
-                      alt={`Portrait of ${member.name}, ${member.role} at MyScriptic`}
-                      className="w-20 h-20 rounded-full object-cover mx-auto mb-4 border-2 border-brand/20"
-                    />
+                    <div
+                      className="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-brand/20 bg-brand/10 flex items-center justify-center"
+                      aria-label={`Portrait of ${member.name}, ${member.role} at MyScriptic`}
+                    >
+                      <span className="text-xl font-bold text-brand">{member.initials}</span>
+                    </div>
                     <h3 className="font-semibold text-foreground mb-0.5">{member.name}</h3>
                     <p className="text-xs text-brand font-medium mb-2">{member.role}</p>
                     <p className="text-xs text-muted-foreground leading-relaxed">{member.bio}</p>
