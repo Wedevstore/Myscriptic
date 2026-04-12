@@ -19,6 +19,7 @@ import {
   Star, Users, ArrowRight, Globe, Award, Zap, GraduationCap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import {
   mergeLegacyDiscoverAuthorFollows,
   loadAuthorFollowIdsFromStorage,
@@ -448,11 +449,12 @@ function DiscoverContent() {
                     </Badge>
                   </div>
                 )}
-                <Link href={`/books/${book.id}`} className="shrink-0">
-                  <img
+                <Link href={`/books/${book.id}`} className="relative block shrink-0 w-16 h-24 overflow-hidden rounded-lg shadow bg-muted">
+                  <CoverImage
                     src={book.coverUrl}
                     alt={`Cover of ${book.title}`}
-                    className="w-16 h-24 object-cover rounded-lg shadow"
+                    sizes="64px"
+                    className="rounded-lg"
                   />
                 </Link>
                 <div className="flex-1 min-w-0">

@@ -23,6 +23,7 @@ import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { cartApi, storeApi } from "@/lib/api"
 import { seedStore, CURRENCY_SYMBOLS } from "@/lib/store"
 import { MOCK_BOOKS } from "@/lib/mock-data"
+import { CoverImage } from "@/components/ui/cover-image"
 import {
   ShoppingCart, Search, Filter, Star, BookOpen, Headphones,
   Tag, TrendingUp, Zap, SlidersHorizontal, Check, X,
@@ -173,11 +174,12 @@ function BookCard({ book, onAddToCart, inCart }: {
 }) {
   return (
     <div className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:border-brand/30 transition-all duration-200 flex flex-col">
-      <Link href={`/books/${book.id}`} className="relative block shrink-0 overflow-hidden">
-        <img
+      <Link href={`/books/${book.id}`} className="relative block h-52 w-full shrink-0 overflow-hidden bg-muted">
+        <CoverImage
           src={book.coverUrl}
           alt={`Cover of ${book.title} by ${book.author}`}
-          className="w-full h-52 object-cover group-hover:scale-105 transition-transform duration-300"
+          sizes="(max-width: 768px) 50vw, 320px"
+          className="group-hover:scale-105 transition-transform duration-300"
         />
         {book.discount > 0 && (
           <div className="absolute top-2.5 left-2.5 bg-destructive text-destructive-foreground text-[10px] font-bold px-2 py-0.5 rounded-md">

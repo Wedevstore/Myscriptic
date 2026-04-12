@@ -20,6 +20,7 @@ import {
   GraduationCap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import { booksApi, authorSalesApi, authorSubscriptionPoolApi } from "@/lib/api"
 import { normalizeAuthorMyBooksList } from "@/lib/author-my-books"
 import { apiUrlConfigured } from "@/lib/auth-mode"
@@ -505,11 +506,14 @@ function AuthorDashboardContent() {
               const status = STATUS_CONFIG[book.status] ?? STATUS_CONFIG.DRAFT
               return (
                 <div key={book.id} className="flex items-center gap-3 p-4 hover:bg-muted/40 transition-colors">
-                  <img
-                    src={book.coverUrl}
-                    alt={`Cover of ${book.title}`}
-                    className="w-10 h-14 object-cover rounded-md shrink-0"
-                  />
+                  <div className="relative w-10 h-14 shrink-0 overflow-hidden rounded-md bg-muted">
+                    <CoverImage
+                      src={book.coverUrl}
+                      alt={`Cover of ${book.title}`}
+                      sizes="40px"
+                      className="rounded-md"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{book.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">

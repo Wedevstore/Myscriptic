@@ -35,6 +35,7 @@ import {
   AlertCircle, Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 
 const MOCK_REVIEWS = [
   { id: "r1", user: "Amara K.", avatar: "AK", rating: 5, date: "Jan 15, 2026", comment: "Absolutely captivating! I finished it in one sitting. The characters feel so real and the writing is superb." },
@@ -475,11 +476,13 @@ function BookDetailContent() {
 
   const coverSlot = (
     <div className="flex flex-col items-center gap-4 lg:items-start">
-      <div className="relative w-full shrink-0">
-        <img
+      <div className="relative aspect-[2/3] w-full shrink-0 overflow-hidden rounded-2xl shadow-2xl bg-muted">
+        <CoverImage
           src={book.coverUrl}
           alt={`Book cover of ${book.title} by ${book.author}`}
-          className="aspect-[2/3] w-full rounded-2xl object-cover shadow-2xl"
+          priority
+          sizes="(max-width: 640px) 200px, (max-width: 1024px) 240px, 280px"
+          className="rounded-2xl"
         />
         {book.isNew && (
           <Badge className="absolute left-3 top-3 bg-brand text-primary-foreground">New</Badge>

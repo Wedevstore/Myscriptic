@@ -20,6 +20,7 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import { seedStore, SALES_COMMISSION_PCT } from "@/lib/store"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 import { demoPic } from "@/lib/demo-images"
@@ -275,11 +276,14 @@ function BookSalesRow({ book }: { book: BookSalesStat }) {
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors text-left"
       >
-        <img
-          src={book.coverUrl}
-          alt={`Cover of ${book.title}`}
-          className="w-10 h-14 object-cover rounded-lg shrink-0"
-        />
+        <div className="relative w-10 h-14 shrink-0 overflow-hidden rounded-lg bg-muted">
+          <CoverImage
+            src={book.coverUrl}
+            alt={`Cover of ${book.title}`}
+            sizes="40px"
+            className="rounded-lg"
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{book.title}</p>
           <div className="flex items-center gap-2 mt-0.5">

@@ -16,6 +16,7 @@ import { apiUrlConfigured } from "@/lib/auth-mode"
 import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { Headphones, Play, Clock, Star, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 
 const MOCK_AUDIOBOOKS = MOCK_BOOKS.filter(b => b.format === "audiobook")
 
@@ -39,10 +40,10 @@ function AudiobookCard({ book }: { book: BookCardData }) {
     <div className="book-card bg-card border border-border rounded-xl overflow-hidden flex flex-col">
       {/* Cover */}
       <div className="relative aspect-square overflow-hidden bg-muted">
-        <img
+        <CoverImage
           src={book.coverUrl}
           alt={`Cover art of audiobook ${book.title}`}
-          className="w-full h-full object-cover"
+          sizes="(max-width: 768px) 45vw, 280px"
         />
         {/* Play overlay */}
         <Link
@@ -108,11 +109,12 @@ function AudiobookListItem({ book }: { book: BookCardData }) {
   const duration = "9h 30m"
   return (
     <div className="flex gap-4 p-4 rounded-xl border border-border bg-card hover:border-brand/30 transition-all group">
-      <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0">
-        <img
+      <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-muted">
+        <CoverImage
           src={book.coverUrl}
           alt={`Cover of ${book.title}`}
-          className="w-full h-full object-cover"
+          sizes="64px"
+          className="rounded-xl"
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
           <Play size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity fill-white" />

@@ -19,6 +19,7 @@ import {
   List, ChevronDown, ChevronUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import { ProtectedSurface } from "@/components/protected-surface"
 import { ReportButton } from "@/components/report-dialog"
 
@@ -347,13 +348,14 @@ function AudioPlayerContent() {
         {/* Cover art */}
         <div className="relative">
           <div className={cn(
-            "w-56 h-56 md:w-72 md:h-72 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500",
+            "relative w-56 h-56 md:w-72 md:h-72 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 bg-muted",
             isPlaying ? "shadow-brand/30 scale-105" : "scale-100"
           )}>
-            <img
+            <CoverImage
               src={book.coverUrl}
               alt={`Audiobook cover of ${book.title}`}
-              className="w-full h-full object-cover"
+              sizes="(max-width: 768px) 224px, 288px"
+              className="rounded-3xl"
             />
           </div>
           {isPlaying && (

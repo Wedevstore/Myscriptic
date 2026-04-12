@@ -15,19 +15,21 @@ type CoverImageProps = {
   sizes?: string
 }
 
-const OPTIMIZABLE_HOSTS = [
-  "amazonaws.com",
-  "cloudfront.net",
-  "placehold.co",
-  "picsum.photos",
-  "fastly.picsum.photos",
-]
+/** Hosts where the Next.js image optimizer should proxy the URL (CDN / placeholders). */
+const OPTIMIZER_HOSTS = ["placehold.co", "picsum.photos", "fastly.picsum.photos"]
 
-function canOptimize(url: string): boolean {
+/**
+ * S3 / CloudFront: load in the browser (same as `<img src>`), not via `/_next/image`.
+ * Many buckets are public for browsers but fail or 403 for the optimizer’s server-side fetch.
+ */
+function useImageOptimizer(url: string): boolean {
   if (!url.trim()) return false
   try {
     const hostname = new URL(url).hostname
-    return OPTIMIZABLE_HOSTS.some(h => hostname === h || hostname.endsWith(`.${h}`))
+    if (hostname.endsWith(".amazonaws.com") || hostname.endsWith(".cloudfront.net")) {
+      return false
+    }
+    return OPTIMIZER_HOSTS.some(h => hostname === h || hostname.endsWith(`.${h}`))
   } catch {
     return url.startsWith("/")
   }
@@ -53,7 +55,7 @@ export function CoverImage({ src, alt, className, priority, sizes }: CoverImageP
       fill
       sizes={sizes ?? "(max-width: 768px) 50vw, 320px"}
       className={cn("object-cover", className)}
-      unoptimized={!canOptimize(resolvedSrc)}
+      unoptimized={!useImageOptimizer(resolvedSrc)}
       priority={priority}
       onError={() => {
         setResolvedSrc(cur => (cur === COVER_PLACEHOLDER ? cur : COVER_PLACEHOLDER))

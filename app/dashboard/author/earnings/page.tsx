@@ -29,6 +29,7 @@ import {
   BarChart3, BookOpen, Users, Zap, Lock, Shield, Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import { authorSubscriptionPoolApi, booksApi } from "@/lib/api"
 import { normalizeAuthorMyBooksList } from "@/lib/author-my-books"
 import { apiUrlConfigured } from "@/lib/auth-mode"
@@ -398,11 +399,14 @@ function BookEngagementTable({
               <tr key={book.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
-                    <img
-                      src={book.coverUrl}
-                      alt={`Cover of ${book.title}`}
-                      className="w-8 h-12 object-cover rounded"
-                    />
+                    <div className="relative w-8 h-12 shrink-0 overflow-hidden rounded bg-muted">
+                      <CoverImage
+                        src={book.coverUrl}
+                        alt={`Cover of ${book.title}`}
+                        sizes="32px"
+                        className="rounded"
+                      />
+                    </div>
                     <div>
                       <p className="font-medium text-foreground text-xs line-clamp-1">{book.title}</p>
                       <p className="text-[10px] text-muted-foreground">{book.category}</p>

@@ -20,6 +20,7 @@ import {
   BookOpen, Headphones, TrendingUp, Download, Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 
 type ApprovalStatus = "pending" | "approved" | "rejected"
 
@@ -341,11 +342,14 @@ function BooksContent() {
                   return (
                     <tr key={book.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3">
-                        <img
-                          src={book.coverUrl}
-                          alt={`Cover of ${book.title}`}
-                          className="w-10 h-14 object-cover rounded-md shrink-0"
-                        />
+                        <div className="relative w-10 h-14 shrink-0 overflow-hidden rounded-md bg-muted">
+                          <CoverImage
+                            src={book.coverUrl}
+                            alt={`Cover of ${book.title}`}
+                            sizes="40px"
+                            className="rounded-md"
+                          />
+                        </div>
                       </td>
                       <td className="px-4 py-3 max-w-[180px]">
                         <p className="font-medium text-foreground truncate">{book.title}</p>

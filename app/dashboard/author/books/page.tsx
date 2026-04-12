@@ -40,6 +40,7 @@ import { normalizeAuthorMyBooksList } from "@/lib/author-my-books"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import { demoPic } from "@/lib/demo-images"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "@/components/ui/cover-image"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 
 type BookStatus = "approved" | "pending" | "rejected" | "draft"
@@ -351,11 +352,14 @@ function AuthorBooksContent() {
                   <TableRow key={book.id} className="hover:bg-muted/30 transition-colors">
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <img
-                          src={book.coverUrl}
-                          alt={`Cover of ${book.title}`}
-                          className="w-10 h-14 object-cover rounded-md shadow-sm shrink-0"
-                        />
+                        <div className="relative w-10 h-14 shrink-0 overflow-hidden rounded-md shadow-sm bg-muted">
+                          <CoverImage
+                            src={book.coverUrl}
+                            alt={`Cover of ${book.title}`}
+                            sizes="40px"
+                            className="rounded-md"
+                          />
+                        </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-sm text-foreground line-clamp-1">{book.title}</p>
                           <p className="text-xs text-muted-foreground">{book.category}</p>
