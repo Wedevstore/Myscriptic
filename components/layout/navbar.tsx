@@ -29,6 +29,7 @@ import { CoverImage } from "@/components/ui/cover-image"
 import { CART_CHANGED } from "@/lib/cart-events"
 import { fetchCartItemCount } from "@/lib/cart-actions"
 import { MOCK_BOOKS } from "@/lib/mock-data"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { booksApi } from "@/lib/api"
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
 import type { BookCardData } from "@/components/books/book-card"
@@ -239,6 +240,7 @@ function SearchPalette({ onClose }: { onClose: () => void }) {
     const q = query.trim()
     if (!q) return []
     if (q.length >= 2) return apiResults.slice(0, 6)
+    if (!allowMockCatalogFallback()) return []
     const ql = q.toLowerCase()
     return MOCK_BOOKS.filter(
       b => b.title.toLowerCase().includes(ql) || b.author.toLowerCase().includes(ql) || b.category.toLowerCase().includes(ql)

@@ -16,6 +16,7 @@ import { apiBookToCard, normalizeApiBookRecord, type ApiBookRecord } from "@/lib
 import { resolveBookSampleExcerpt } from "@/lib/book-sample-excerpts"
 import type { BookCardData } from "@/components/books/book-card"
 import { apiUrlConfigured, laravelAuthEnabled, laravelPhase2Enabled } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { addBookToCart, refreshBookInCart } from "@/lib/cart-actions"
 import { wishlistStore } from "@/lib/wishlist-store"
 import { WISHLIST_CHANGED } from "@/lib/wishlist-events"
@@ -144,7 +145,28 @@ function BookDetailContent() {
       })
   }, [bookId, liveBooks])
 
-  const book = remote ?? MOCK_BOOKS.find(b => b.id === bookId) ?? MOCK_BOOKS[0]
+  const mockFb = allowMockCatalogFallback()
+  const book = remote ?? (mockFb ? (MOCK_BOOKS.find(b => b.id === bookId) ?? MOCK_BOOKS[0]) : null)
+
+  if (!book) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        {liveBooks ? (
+          <>
+            <Loader2 className="h-8 w-8 animate-spin text-brand" />
+            <p className="text-muted-foreground">Loading book details...</p>
+          </>
+        ) : (
+          <>
+            <AlertCircle className="h-8 w-8 text-muted-foreground" />
+            <p className="text-muted-foreground">Book not found</p>
+            <Button variant="outline" onClick={() => router.push("/books")}>Browse Books</Button>
+          </>
+        )}
+      </div>
+    )
+  }
+
   const extras = BOOK_EXTRAS[book.id] ?? BOOK_EXTRAS["bk_001"]
   const descriptionText = (remoteDesc ?? extras.description).trim()
   const resolvedSample = resolveBookSampleExcerpt(book.id, remoteSample)

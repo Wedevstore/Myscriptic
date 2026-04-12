@@ -233,10 +233,18 @@ function HomeContent() {
     )
   }
 
+  const fallbackBooks = allowMockCatalogFallback() ? DEFAULT_HOME_BOOKS : {
+    trendingBooks: [],
+    newArrivals: [],
+    freeBooks: [],
+    audiobooks: [],
+    subscriptionBooks: [],
+  }
+
   return (
     <MockHomeContent
       sections={storeSections}
-      books={liveBooks ?? DEFAULT_HOME_BOOKS}
+      books={liveBooks ?? fallbackBooks}
     />
   )
 }

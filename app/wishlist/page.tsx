@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Heart, Search, ShoppingCart, BookOpen, Trash2, ChevronRight, Loader2 } from "lucide-react"
 import { MOCK_BOOKS } from "@/lib/mock-data"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import type { BookCardData } from "@/components/books/book-card"
 import { wishlistStore } from "@/lib/wishlist-store"
 import { WISHLIST_CHANGED } from "@/lib/wishlist-events"
@@ -65,11 +66,12 @@ function WishlistContent() {
       setResolvedBooks([])
       return
     }
-    const fromMock = wishlistIds
-      .map(id => MOCK_BOOKS.find(b => b.id === id))
-      .filter((b): b is BookCardData => b != null)
+    const mockFb = allowMockCatalogFallback()
+    const fromMock = mockFb
+      ? wishlistIds.map(id => MOCK_BOOKS.find(b => b.id === id)).filter((b): b is BookCardData => b != null)
+      : []
 
-    if (fromMock.length === wishlistIds.length) {
+    if (mockFb && fromMock.length === wishlistIds.length) {
       setResolvedBooks(fromMock)
       return
     }
@@ -90,7 +92,7 @@ function WishlistContent() {
         .map((id, i) => {
           const fromApi = rows[i]
           if (fromApi) return fromApi
-          return MOCK_BOOKS.find(b => b.id === id) ?? null
+          return allowMockCatalogFallback() ? (MOCK_BOOKS.find(b => b.id === id) ?? null) : null
         })
         .filter((b): b is BookCardData => b != null)
       setResolvedBooks(merged.length ? merged : fromMock)
@@ -100,7 +102,9 @@ function WishlistContent() {
 
   const wishlistBooks = resolvedBooks.length
     ? resolvedBooks
-    : wishlistIds.map(id => MOCK_BOOKS.find(b => b.id === id)).filter((b): b is BookCardData => b != null)
+    : allowMockCatalogFallback()
+      ? wishlistIds.map(id => MOCK_BOOKS.find(b => b.id === id)).filter((b): b is BookCardData => b != null)
+      : []
 
   const filtered = wishlistBooks.filter(b =>
     !search ||
@@ -251,7 +255,7 @@ function WishlistContent() {
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {MOCK_BOOKS.filter(b => !wishlistIds.includes(b.id)).slice(0, 4).map(book => (
+            {(allowMockCatalogFallback() ? MOCK_BOOKS : resolvedBooks).filter(b => !wishlistIds.includes(b.id)).slice(0, 4).map(book => (
               <BookCard key={book.id} book={book} />
             ))}
           </div>

@@ -1,6 +1,8 @@
 import type { BookCardData, AccessType, BookFormat } from "@/components/books/book-card"
 import { demoPic } from "@/lib/demo-images"
 
+const FALLBACK_COVER = "/images/book-placeholder.svg"
+
 /** Shape returned by Laravel book list/search payloads (camelCase JSON). */
 export type ApiBookRecord = {
   id: string | number
@@ -142,7 +144,7 @@ export function apiBookToCard(raw: unknown): BookCardData {
       id: "0",
       title: "Untitled",
       author: "Unknown",
-      coverUrl: demoPic("fallback-cover"),
+      coverUrl: FALLBACK_COVER,
       rating: 0,
       reviewCount: 0,
       accessType: "FREE",
@@ -154,7 +156,7 @@ export function apiBookToCard(raw: unknown): BookCardData {
     id: String(b.id),
     title: b.title,
     author: b.author,
-    coverUrl: b.coverUrl || demoPic("fallback-cover"),
+    coverUrl: b.coverUrl || FALLBACK_COVER,
     rating: b.rating ?? 0,
     reviewCount: b.reviewCount ?? 0,
     price: b.price ?? undefined,

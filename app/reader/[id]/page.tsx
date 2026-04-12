@@ -26,6 +26,7 @@ import { booksApi, libraryApi, progressApi } from "@/lib/api"
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
 import type { BookCardData } from "@/components/books/book-card"
 import { laravelPhase3Enabled } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import {
   engagementStore, subscriptionStore,
 } from "@/lib/store"
@@ -490,13 +491,15 @@ function ReaderContent() {
     }
   }, [routeId])
 
-  const book = remoteBook ?? MOCK_BOOKS.find(b => b.id === routeId) ?? MOCK_BOOKS[0]
+  const EMPTY_BOOK: BookCardData = { id: routeId, title: "Loading…", author: "", coverUrl: "", rating: 0, reviewCount: 0, accessType: "FREE", format: "ebook", category: "" }
+  const book = remoteBook ?? (allowMockCatalogFallback() ? (MOCK_BOOKS.find(b => b.id === routeId) ?? MOCK_BOOKS[0]) : EMPTY_BOOK)
+  const bookReady = book !== EMPTY_BOOK
 
   /** Audiobooks live in S3 and use `/audio/[id]`; skip ebook fetch/parse pipeline. */
   React.useEffect(() => {
-    if (book.format !== "audiobook") return
+    if (!bookReady || book.format !== "audiobook") return
     router.replace(`/audio/${routeId}`)
-  }, [book.format, routeId, router])
+  }, [bookReady, book.format, routeId, router])
 
   /** Stable id for engagement + progress APIs (numeric Laravel id vs mock `bk_*`). */
   const engagementBookId = /^\d+$/.test(routeId) ? routeId : book.id
@@ -1263,6 +1266,15 @@ function ReaderContent() {
   }, [prefersReducedMotion, readingLayout])
 
   // ── Loading / Access gate renders ─────────────────────────────────────────
+  if (!bookReady) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-3">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" aria-hidden />
+        <p className="text-sm text-muted-foreground">Loading book…</p>
+      </div>
+    )
+  }
+
   if (book.format === "audiobook") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-3">

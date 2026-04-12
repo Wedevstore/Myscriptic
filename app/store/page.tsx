@@ -19,6 +19,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { cartStore } from "@/lib/cart-store"
 import { addBookToCart } from "@/lib/cart-actions"
 import { apiUrlConfigured, laravelPhase2Enabled } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { cartApi, storeApi } from "@/lib/api"
 import { seedStore, CURRENCY_SYMBOLS } from "@/lib/store"
 import { MOCK_BOOKS } from "@/lib/mock-data"
@@ -289,10 +290,11 @@ function StoreContent() {
       .then(res => {
         if (!alive) return
         const rows = (res.data as Record<string, unknown>[]).map(apiBookToGrid)
-        setCatalog(rows.length ? rows : EXTENDED_STORE)
+        const fallback = allowMockCatalogFallback() ? EXTENDED_STORE : []
+        setCatalog(rows.length ? rows : fallback)
       })
       .catch(() => {
-        if (alive) setCatalog(EXTENDED_STORE)
+        if (alive) setCatalog(allowMockCatalogFallback() ? EXTENDED_STORE : [])
       })
       .finally(() => {
         if (alive) setCatalogLoading(false)

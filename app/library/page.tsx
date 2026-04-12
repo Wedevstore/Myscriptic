@@ -17,6 +17,7 @@ import {
   Star,
 } from "lucide-react"
 import { MOCK_BOOKS } from "@/lib/mock-data"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { libraryApi } from "@/lib/api"
 import { apiUrlConfigured } from "@/lib/auth-mode"
 import { demoPic } from "@/lib/demo-images"
@@ -90,6 +91,7 @@ function getBookDisplay(
   liveMap: Map<string, BookDisplay> | null,
 ): BookDisplay | null {
   if (liveMap?.has(entry.bookId)) return liveMap.get(entry.bookId)!
+  if (!allowMockCatalogFallback()) return null
   const book = MOCK_BOOKS.find(b => b.id === entry.bookId)
   if (!book) return null
   return {

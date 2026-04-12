@@ -16,6 +16,7 @@ import { MOCK_BOOKS, CATEGORIES, resolveMockAuthorId } from "@/lib/mock-data"
 import { authorsApi, booksApi } from "@/lib/api"
 import { apiBookToCard, type ApiBookRecord } from "@/lib/book-mapper"
 import { apiUrlConfigured } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import {
   Search, SlidersHorizontal, X, ChevronDown, BookOpen,
   Headphones, Grid3X3, List,
@@ -185,7 +186,7 @@ function BooksContent() {
     }
     if (unknownMockAuthorParam) return []
     if (numericAuthorId && apiBooks !== null) return apiBooks
-    return apiBooks ?? MOCK_BOOKS
+    return apiBooks ?? (allowMockCatalogFallback() ? MOCK_BOOKS : [])
   }, [mockAuthorResolved, unknownMockAuthorParam, numericAuthorId, apiBooks])
 
   const categoryChips = apiCats.length

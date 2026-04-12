@@ -11,6 +11,7 @@ import { booksApi } from "@/lib/api"
 import { apiBookToCard } from "@/lib/book-mapper"
 import { resolveAudiobookStreamUrl } from "@/lib/audiobook-stream"
 import { apiUrlConfigured } from "@/lib/auth-mode"
+import { allowMockCatalogFallback } from "@/lib/catalog-mode"
 import { MOCK_BOOKS } from "@/lib/mock-data"
 import {
   ChevronLeft, Play, Pause, SkipBack, SkipForward,
@@ -77,6 +78,9 @@ function AudioPlayerContent() {
     (typeof process !== "undefined" && process.env.NEXT_PUBLIC_AUDIOBOOK_DEMO_STREAM_URL?.trim()) || ""
 
   const fallbackMeta = React.useMemo<PlayerBookMeta>(() => {
+    if (!allowMockCatalogFallback()) {
+      return { id: routeId, title: "Loading...", author: "", coverUrl: "" }
+    }
     const m =
       MOCK_BOOKS.find(b => b.id === routeId) ??
       MOCK_BOOKS.find(b => b.format === "audiobook") ??
