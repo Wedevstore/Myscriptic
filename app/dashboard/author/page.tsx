@@ -51,8 +51,8 @@ const AUTHOR_BOOKS: DashboardBook[] = MOCK_BOOKS.slice(0, 5).map((b, i) => ({
 
 function approvalToDashboardStatus(raw: string): DashboardBookStatus {
   const u = raw.toLowerCase()
-  if (u === "approved") return "APPROVED"
-  if (u === "pending") return "PENDING"
+  if (u === "approved" || u === "live" || u === "published" || u === "active") return "APPROVED"
+  if (u === "pending" || u === "in_review" || u === "review") return "PENDING"
   if (u === "rejected") return "REJECTED"
   return "DRAFT"
 }
@@ -235,7 +235,7 @@ function AuthorDashboardContent() {
     let alive = true
     setLiveSnap(undefined)
     Promise.all([
-      booksApi.listMine({ per_page: "48" }),
+      booksApi.listMine({ per_page: "48" }).catch(() => ({ data: [] as unknown[] })),
       authorSalesApi.summary().catch(() => null),
       authorSalesApi.books().catch(() => ({ data: [] })),
       authorSubscriptionPoolApi.summary().catch(() => null),
@@ -328,8 +328,7 @@ function AuthorDashboardContent() {
     ...b,
     reads: bookReadMap[b.id] ?? b.reads,
     earnings:
-      earnings.filter(e => e.bookId === b.id).reduce((s, e) => s + e.net, 0)
-      + payouts.filter(p => p.cycleId).reduce(s => s, 0) / Math.max(1, AUTHOR_BOOKS.length),
+      earnings.filter(e => e.bookId === b.id).reduce((s, e) => s + e.net, 0),
   }))
 
   const liveLoading = useLiveApi && liveSnap === undefined
@@ -503,7 +502,7 @@ function AuthorDashboardContent() {
             )}
             {!liveLoading &&
               LIVE_AUTHOR_BOOKS.map(book => {
-              const status = STATUS_CONFIG[book.status]
+              const status = STATUS_CONFIG[book.status] ?? STATUS_CONFIG.DRAFT
               return (
                 <div key={book.id} className="flex items-center gap-3 p-4 hover:bg-muted/40 transition-colors">
                   <img

@@ -54,8 +54,9 @@ function parseAccess(raw: unknown): AccessType {
 
 /**
  * Unwrap Laravel JSON:API style `{ data: { attributes } }` or flat objects.
+ * Exported for author “my books” and other list endpoints that reuse the same shapes.
  */
-function unwrapBookRow(raw: unknown): Record<string, unknown> | null {
+export function unwrapBookRow(raw: unknown): Record<string, unknown> | null {
   if (raw == null || typeof raw !== "object") return null
   const o = raw as Record<string, unknown>
   const inner = o.data

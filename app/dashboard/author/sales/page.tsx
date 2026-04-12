@@ -397,7 +397,7 @@ function SalesContent() {
     let alive = true
     setLiveLoading(true)
     Promise.all([
-      booksApi.listMine({ per_page: "96" }),
+      booksApi.listMine({ per_page: "96" }).catch(() => ({ data: [] as unknown[] })),
       authorSalesApi.summary().catch(() => null),
       authorSalesApi.books().catch(() => ({ data: [] })),
       authorSalesApi.transactions().catch(() => ({ data: [] })),

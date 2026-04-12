@@ -72,7 +72,10 @@ const MOCK_AUTHOR_ROWS: AuthorBookRow[] = MOCK_BOOKS.slice(0, 6).map((b, i) => (
 
 function mapApprovalToAuthorStatus(raw: unknown): BookStatus {
   const s = String(raw ?? "").toLowerCase()
-  if (s === "approved" || s === "pending" || s === "rejected" || s === "draft") return s
+  if (s === "approved" || s === "live" || s === "published" || s === "active") return "approved"
+  if (s === "pending" || s === "in_review" || s === "review") return "pending"
+  if (s === "rejected") return "rejected"
+  if (s === "draft") return "draft"
   return "pending"
 }
 
@@ -104,9 +107,14 @@ function mineApiToRow(b: Record<string, unknown>, earningsByBook: Record<string,
     createdRaw instanceof Date
       ? createdRaw.getTime()
       : Date.parse(typeof createdRaw === "string" || typeof createdRaw === "number" ? String(createdRaw) : "")
-  const approved = String(approval ?? "").toLowerCase() === "approved"
+  const approvalLc = String(approval ?? "").toLowerCase()
+  const approvedLive =
+    approvalLc === "approved" ||
+    approvalLc === "live" ||
+    approvalLc === "published" ||
+    approvalLc === "active"
   const publishedAt =
-    approved && Number.isFinite(createdMs)
+    approvedLive && Number.isFinite(createdMs)
       ? new Date(createdMs).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
       : "—"
   const eng =
@@ -172,7 +180,7 @@ function AuthorBooksContent() {
     let alive = true
     setLiveLoading(true)
     Promise.all([
-      booksApi.listMine({ per_page: "96" }),
+      booksApi.listMine({ per_page: "96" }).catch(() => ({ data: [] as unknown[] })),
       authorSalesApi.books().catch(() => ({ data: [] as unknown[] })),
     ])
       .then(([mineRes, salesRes]) => {
